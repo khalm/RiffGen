@@ -98,6 +98,13 @@ input[type=range]::-moz-range-thumb{width:20px;height:20px;border-radius:50%;bac
 .tuneread{margin:0;display:flex;flex-wrap:wrap;gap:4px 10px;align-items:baseline;padding:10px 12px;border-radius:10px;background:var(--chip)}
 .tuneread b{font-family:var(--f-mono);font-weight:700;font-size:22px;line-height:1.1;letter-spacing:.06em;word-break:break-all}
 .tuneread span{font-family:var(--f-mono);font-size:13px;color:var(--muted)}
+.sigs{display:grid;grid-template-columns:repeat(6,1fr);gap:5px}
+.sigs button{border:1px solid var(--line);background:var(--surface);border-radius:8px;height:40px;font-family:var(--f-mono);font-weight:600;font-size:14px;padding:0}
+.sigs button[aria-pressed="true"]{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+.sigcustom{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.sigcustom .grp{grid-column:1/-1}
+.sigcustom input{padding:9px 10px;border-radius:9px;border:1px solid var(--line);background:var(--surface);font-family:var(--f-mono);font-size:15px}
+.sigmsg{margin:0;font-size:13px;color:var(--heat)}
 .custom{display:flex;flex-direction:column;gap:8px}
 .cstr{display:grid;grid-template-columns:repeat(auto-fill,minmax(64px,1fr));gap:6px}
 .cstr select{padding:8px 6px;font-family:var(--f-mono);font-size:14px}
@@ -203,7 +210,7 @@ textarea#fallback{width:100%;height:140px;font-family:var(--f-mono);font-size:12
 </head>
 <body>
 <header class="top">
-  <div class="brand"><h1>Riff<span>Gen</span></h1><span class="ver" id="ver">v1.4.0</span><button class="btn install" id="installBtn" hidden>Install app</button></div>
+  <div class="brand"><h1>Riff<span>Gen</span></h1><span class="ver" id="ver">v1.5.0</span><button class="btn install" id="installBtn" hidden>Install app</button></div>
   <p class="ihint" id="installHint" hidden></p>
   <p>Original riffs for guitar, bass and synth. Pick a key, set how much it bites, and press play.</p>
 </header>
@@ -236,6 +243,14 @@ textarea#fallback{width:100%;height:140px;font-family:var(--f-mono);font-size:12
     </div>
 
     <div class="group">
+      <div class="lbl">Time signature <output id="sigOut">4/4</output></div>
+      <div class="sigs" id="sigs"></div>
+      <div class="sigcustom" id="sigCustom" hidden>
+        <label class="field">Beats<select id="sigN"></select></label>
+        <label class="field">Note value<select id="sigD"><option value="2">2 (half)</option><option value="4">4 (quarter)</option><option value="8">8 (eighth)</option><option value="16">16 (sixteenth)</option></select></label>
+        <label class="field grp">Accent groups<input id="sigG" placeholder="e.g. 3+2+2" inputmode="numeric" autocomplete="off"></label>
+      </div>
+      <p class="sigmsg" id="sigMsg" hidden></p>
       <div class="lbl">Length</div>
       <div class="seg" id="barSeg">
         <button data-v="1" aria-pressed="false">1 bar</button>
@@ -318,7 +333,7 @@ textarea#fallback{width:100%;height:140px;font-family:var(--f-mono);font-size:12
     </div>
   </section>
 </main>
-<p class="foot">RiffGen <span id="ver2">v1.4.0</span> · Everything is generated and played in your browser. Free, no account.</p>
+<p class="foot">RiffGen <span id="ver2">v1.5.0</span> · Everything is generated and played in your browser. Free, no account.</p>
 
 <div class="transport"><div class="tin">
   <button class="play" id="play" aria-pressed="false"><svg viewBox="0 0 20 20" id="playIcon"><path d="M5 3l12 7-12 7z"/></svg><span id="playTxt">Play</span></button>
@@ -329,7 +344,7 @@ textarea#fallback{width:100%;height:140px;font-family:var(--f-mono);font-size:12
 <div class="toast" id="toast" role="status"></div>
 
 <script>
-const VERSION = '1.4.0';
+const VERSION = '1.5.0';
 document.getElementById('ver').textContent = 'v' + VERSION;
 document.getElementById('ver2').textContent = 'v' + VERSION;
 
@@ -410,7 +425,7 @@ const newSeed = () => { try { const a=new Uint32Array(1); crypto.getRandomValues
 
 /* ---------- state ---------- */
 const DEFAULTS = {instrument:'guitar',tuning:{guitar:'std',bass:'std4'},transpose:{guitar:0,bass:0},tone:{guitar:'crunch',bass:'finger',synth:'saw'},
-  root:4,scale:'Minor (Aeolian)',bars:4,bpm:140,diss:0.3,busy:0.55,cx:0.45,custom:{guitar:[40,45,50,55,59,64],bass:[28,33,38,43]},swing:false,drums:true,loop:true,rSeed:4127,pSeed:90211,edit:null};
+  root:4,scale:'Minor (Aeolian)',sig:{n:4,d:4,g:''},sigCustom:false,bars:4,bpm:140,diss:0.3,busy:0.55,cx:0.45,custom:{guitar:[40,45,50,55,59,64],bass:[28,33,38,43]},swing:false,drums:true,loop:true,rSeed:4127,pSeed:90211,edit:null};
 function sanitize(o){
   const s = JSON.parse(JSON.stringify(DEFAULTS));
   if(!o||typeof o!=='object') return s;
@@ -425,6 +440,8 @@ function sanitize(o){
   if(Number.isInteger(o.root)&&o.root>=0&&o.root<12) s.root=o.root;
   if(SCALES[o.scale]) s.scale=o.scale;
   if([1,2,4,8].includes(o.bars)) s.bars=o.bars;
+  if(o.sig&&Number.isInteger(o.sig.n)&&o.sig.n>=1&&o.sig.n<=15&&[2,4,8,16].includes(o.sig.d)) s.sig={n:o.sig.n,d:o.sig.d,g:typeof o.sig.g==='string'?o.sig.g.replace(/[^0-9+ ]/g,'').slice(0,24):''};
+  if(typeof o.sigCustom==='boolean') s.sigCustom=o.sigCustom;
   if(o.bpm>=60&&o.bpm<=220) s.bpm=Math.round(o.bpm);
   if(o.diss>=0&&o.diss<=1) s.diss=o.diss;
   if(o.busy>=0&&o.busy<=1) s.busy=o.busy;
@@ -432,7 +449,7 @@ function sanitize(o){
   if(o.custom) for(const k of ['guitar','bass']){ const a=o.custom[k]; if(Array.isArray(a)&&a.length>=4&&a.length<=7&&a.every(n=>Number.isInteger(n)&&n>=RANGE[k][0]&&n<=RANGE[k][1])) s.custom[k]=a; }
   for(const k of ['swing','drums','loop']) if(typeof o[k]==='boolean') s[k]=o[k];
   if(o.edit&&Array.isArray(o.edit.events)){
-    const ev=o.edit.events.filter(e=>e&&Number.isInteger(e.abs)&&e.abs>=0&&e.abs<128&&Number.isInteger(e.dur)&&e.dur>=1&&e.dur<=128&&Array.isArray(e.pitches)&&e.pitches.length>=1&&e.pitches.length<=3&&e.pitches.every(p=>Number.isInteger(p)&&p>=12&&p<=108)).slice(0,256)
+    const ev=o.edit.events.filter(e=>e&&Number.isInteger(e.abs)&&e.abs>=0&&e.abs<1024&&Number.isInteger(e.dur)&&e.dur>=1&&e.dur<=1024&&Array.isArray(e.pitches)&&e.pitches.length>=1&&e.pitches.length<=3&&e.pitches.every(p=>Number.isInteger(p)&&p>=12&&p<=108)).slice(0,600)
       .map(e=>({abs:e.abs,dur:e.dur,pitches:[...e.pitches],pm:!!e.pm}));
     s.edit={events:ev}; if(o.edit.src==='ai') s.edit.src='ai';
   }
@@ -444,26 +461,60 @@ let state = DEFAULTS;
 try { const raw = localStorage.getItem('riffgen.state.v1'); if(raw) state = sanitize(JSON.parse(raw)); else state = sanitize(null); } catch(e){ state = sanitize(null); }
 const persist = () => { try { localStorage.setItem('riffgen.state.v1', JSON.stringify(state)); } catch(e){} };
 
+/* ---------- time signature ---------- */
+const SIG_PRESETS=[[4,4],[3,4],[2,4],[6,8],[12,8],[5,4],[7,8],[5,8],[9,8],[7,4],[2,2]];
+function parseGroups(str,n){ if(!str) return null; const g=String(str).split(/[^0-9]+/).map(Number).filter(x=>x>0); return g.length&&g.reduce((a,b)=>a+b,0)===n?g:null; }
+function defaultGroups(n){
+  if(n<=3) return [n];
+  if(n%3===0) return Array(n/3).fill(3);
+  if(n===8) return [3,3,2];
+  if(n%2===0) return Array(n/2).fill(2);
+  return [...Array((n-3)/2).fill(2),3];
+}
+function meter(st){
+  const n=st.sig.n, d=st.sig.d, unit=16/d, spb=n*unit;
+  let beats=[];
+  const grp=parseGroups(st.sig.g,n);
+  if(grp||d>=8){ let c=0; (grp||defaultGroups(n)).forEach(x=>{ beats.push(c*unit); c+=x; }); }
+  else for(let i=0;i<n;i++) beats.push(i*unit);
+  const beatSet=new Set(beats);
+  const later=beats.filter(b=>b>0&&b>=spb/2);
+  const inner=beats.filter(b=>b>0);
+  const half=later.length?later[0]:inner.length?inner[inner.length-1]:Math.max(1,Math.round(spb/4)*2);
+  const strength=s=>s===0?3:beatSet.has(s)?2:s%2===0?1:0;
+  const label=s=>{
+    let i=0; for(let k=0;k<beats.length;k++) if(beats[k]<=s) i=k;
+    const off=s-beats[i];
+    if(off===0) return String(i+1);
+    if(d===4) return ['','e','&','a'][off%4];
+    if(d===2) return off%4===0?'&':off%2===0?'·':'';
+    return off%2===0?'·':'';
+  };
+  const where=s=>{ let i=0; for(let k=0;k<beats.length;k++) if(beats[k]<=s) i=k; return {beat:i+1,off:s-beats[i]}; };
+  return {n,d,unit,spb,beats,beatSet,half:Math.min(half,spb),strength,label,where};
+}
+const sigText=st=>st.sig.n+'/'+st.sig.d+(parseGroups(st.sig.g,st.sig.n)?' ('+parseGroups(st.sig.g,st.sig.n).join('+')+')':'');
+
 /* ---------- riff generator ---------- */
-function rhythm(rSeed, K, rho, cx){
-  const on=[];
-  for(let s=0;s<16;s++){
-    const half=s<8?0:1, u=rnd(rSeed,K.r[half],s,11);
-    let p = s%4===0 ? (0.55+0.45*rho)*(1-0.3*cx) : s%2===0 ? 0.22+0.55*rho : 0.03+0.62*rho*rho;
+function rhythm(rSeed, K, rho, cx, mt){
+  const on=[], spb=mt.spb;
+  for(let s=0;s<spb;s++){
+    const half=s<mt.half?0:1, u=rnd(rSeed,K.r[half],s,11), str=mt.strength(s);
+    let p = str>=2 ? (0.55+0.45*rho)*(1-0.3*cx) : str===1 ? 0.22+0.55*rho : 0.03+0.62*rho*rho;
     if(s%3===0) p+=0.35*cx*cx;
     if((s===0 && K.r[0]!==3) || u<p) on.push(s);
   }
-  if(on.length<3){ [0,6,8,12].forEach(x=>{ if(!on.includes(x)) on.push(x); }); on.sort((a,b)=>a-b); }
+  if(on.length<Math.min(3,mt.beats.length+1)){ [...mt.beats,mt.half].forEach(x=>{ if(x<spb&&!on.includes(x)) on.push(x); }); on.sort((a,b)=>a-b); }
   return on.map((s,i)=>{
-    let dur=(i+1<on.length?on[i+1]:16)-s;
-    const half=s<8?0:1;
+    let dur=(i+1<on.length?on[i+1]:spb)-s;
+    const half=s<mt.half?0:1;
     if(dur>1 && rnd(rSeed,K.r[half],s,12)<0.2+0.25*cx) dur=Math.max(1,Math.ceil(dur/2));
     return {s,dur};
   });
 }
 
 function generate(st){
-  const ins=st.instrument, d=st.diss, rho=st.busy, cx=st.cx;
+  const ins=st.instrument, d=st.diss, rho=st.busy, cx=st.cx, mt=meter(st);
   const tun = getTun(ins,st);
   let r0,pMin,pMax,pedal;
   if(ins==='synth'){ r0=48+st.root; pMin=r0-5; pMax=r0+19+Math.round(cx*5); pedal=r0-12; }
@@ -476,10 +527,10 @@ function generate(st){
   planFor(st.bars,cx).forEach((type,b)=>{
     const K=KEYS[type];
     let prev=null;
-    rhythm(st.rSeed,K,rho,cx).forEach(({s,dur})=>{
-      const pk=K.p[s<8?0:1];
+    rhythm(st.rSeed,K,rho,cx,mt).forEach(({s,dur})=>{
+      const pk=K.p[s<mt.half?0:1], str=mt.strength(s);
       const u=k=>rnd(st.pSeed,pk,s,k);
-      let pedP = s===0 ? (d<0.85?0.9:0.5) : (s%4===0?0.22:0.45)*(1-0.35*d);
+      let pedP = s===0 ? (d<0.85?0.9:0.5) : (str>=2?0.22:0.45)*(1-0.35*d);
       if(ins==='synth') pedP*=0.45;
       if(s!==0) pedP*=1-0.5*cx;
       const isPed=u(0)<pedP;
@@ -504,7 +555,7 @@ function generate(st){
         const iv=wpick(INTS,iw,u(4));
         if(note+iv<=pMax+7) pitches.push(note+iv);
       }
-      events.push({bar:b,s,abs:b*16+s,dur,pitches,pm:isPed&&ins==='guitar'&&dur<=2,ped:isPed,vel:s%4===0?1:s%2===0?0.85:0.75});
+      events.push({bar:b,s,abs:b*mt.spb+s,dur,pitches,pm:isPed&&ins==='guitar'&&dur<=2,ped:isPed,vel:str>=2?1:str===1?0.85:0.75});
     });
   });
   // resolve the last note home when the riff is meant to sound settled
@@ -527,7 +578,7 @@ function finish(events,st,tun,r0){
   });
   if(tun) finger(events,tun.notes);
   const all=events.flatMap(e=>e.pitches);
-  return {events,steps:st.bars*16,r0,tun,lo:all.length?Math.min(...all):r0,hi:all.length?Math.max(...all):r0+12,ins:st.instrument};
+  return {events,steps:st.bars*meter(st).spb,r0,tun,lo:all.length?Math.min(...all):r0,hi:all.length?Math.max(...all):r0+12,ins:st.instrument};
 }
 
 /* playable range for the instrument (used by the editor) */
@@ -539,11 +590,11 @@ function ranges(st){
 }
 
 function fromEdit(st){
-  const R=ranges(st), steps=st.bars*16, tun=R.tun, low=tun?Math.min(...tun.notes):0;
+  const mt=meter(st), R=ranges(st), steps=st.bars*mt.spb, tun=R.tun, low=tun?Math.min(...tun.notes):0;
   const events=st.edit.events.filter(e=>e.abs<steps).map(e=>{
     const pitches=e.pitches.map(p=>{ while(tun&&p<low) p+=12; return p; });
-    const s=e.abs%16;
-    return {bar:Math.floor(e.abs/16),s,abs:e.abs,dur:Math.min(e.dur,steps-e.abs),pitches,pm:!!e.pm&&st.instrument==='guitar',ped:pitches[0]===R.pedal,vel:s%4===0?1:s%2===0?0.85:0.75};
+    const s=e.abs%mt.spb, str=mt.strength(s);
+    return {bar:Math.floor(e.abs/mt.spb),s,abs:e.abs,dur:Math.min(e.dur,steps-e.abs),pitches,pm:!!e.pm&&st.instrument==='guitar',ped:pitches[0]===R.pedal,vel:str>=2?1:str===1?0.85:0.75};
   });
   return finish(events,st,tun,R.r0);
 }
@@ -607,7 +658,7 @@ function render(){
   const st=state;
   $('riffTitle').textContent = NAMES[st.root]+' '+st.scale.replace(/ \(.*\)/,'');
   const tn = riff.tun ? riff.tun.name+' · ' : TONES.synth[st.tone.synth]+' · ';
-  $('riffMeta').textContent = tn+'complexity '+Math.round(st.cx*100)+' · '+st.bars+(st.bars>1?' bars':' bar')+' · '+st.bpm+' BPM · '+riff.events.length+' notes';
+  $('riffMeta').textContent = tn+sigText(st)+' · complexity '+Math.round(st.cx*100)+' · '+st.bars+(st.bars>1?' bars':' bar')+' · '+st.bpm+' BPM · '+riff.events.length+' notes';
   $('seedChip').textContent = 'R'+st.rSeed+' · N'+st.pSeed;
   drawRoll(); renderTab(); updateTools();
 }
@@ -635,8 +686,10 @@ function drawRoll(){
     if(rel(p)===0){ g.fillStyle=line; g.globalAlpha=editing?0.9:0.45; g.fillRect(0,yOf(p),w,rh); g.globalAlpha=1; }
     if(editing){ g.fillStyle=line; g.globalAlpha=0.5; g.fillRect(0,yOf(p)+rh-1,w,1); g.globalAlpha=1; }
   }
-  for(let s=0;s<=riff.steps;s+=(editing?1:4)){
-    const strong=s%16===0, beat=s%4===0;
+  const mt=meter(state);
+  for(let s=0;s<=riff.steps;s++){
+    const strong=s%mt.spb===0, beat=mt.beatSet.has(s%mt.spb);
+    if(!editing&&!beat&&!strong) continue;
     g.fillStyle=strong?muted:line; g.globalAlpha=strong?0.6:beat?1:0.45; g.fillRect(Math.round(s*sw),0,strong?2:1,h); g.globalAlpha=1;
   }
   riff.events.forEach(e=>{
@@ -682,7 +735,7 @@ function renderTab(){
   }
   $('tabLbl').textContent='Tab · '+riff.tun.name;
   box.classList.toggle('editing-tab',editing);
-  const T=riff.tun, nS=T.notes.length, order=[...Array(nS).keys()].reverse();
+  const T=riff.tun, nS=T.notes.length, order=[...Array(nS).keys()].reverse(), MT=meter(state);
   for(let b=0;b<state.bars;b++){
     const bar=document.createElement('div'); bar.className='bar';
     const lab=document.createElement('div'); lab.className='col lab';
@@ -690,8 +743,8 @@ function renderTab(){
     order.forEach(si=>{ const c=document.createElement('div'); c.className='cell'; c.textContent=T.labels[si]; lab.appendChild(c); });
     bar.appendChild(lab);
     const bl0=document.createElement('div'); bl0.className='bl'; bl0.style.height=(nS*21)+'px'; bar.appendChild(bl0);
-    for(let s=0;s<16;s++){
-      const abs=b*16+s, e=byAbs[abs];
+    for(let s=0;s<MT.spb;s++){
+      const abs=b*MT.spb+s, e=byAbs[abs];
       const col=document.createElement('div'); col.className='col'+(sel&&sel.abs===abs?' sel':'');
       const pm=document.createElement('div'); pm.className='cell pm'; pm.textContent=e&&e.pm?'PM':''; col.appendChild(pm);
       order.forEach(si=>{
@@ -700,7 +753,7 @@ function renderTab(){
         c.onclick=()=>tabTap(abs,si);
         col.appendChild(c);
       });
-      const cn=document.createElement('div'); cn.className='cell cnt'; cn.textContent= s%4===0 ? (s/4+1) : ['','e','&','a'][s%4]; col.appendChild(cn);
+      const cn=document.createElement('div'); cn.className='cell cnt'; cn.textContent=MT.label(s); col.appendChild(cn);
       bar.appendChild(col); cols[abs]=col;
     }
     const bl=document.createElement('div'); bl.className='bl'; bl.style.height=(nS*21)+'px'; bar.appendChild(bl);
@@ -721,8 +774,8 @@ function tabText(){
     const bars=[g,g+1].filter(b=>b<st.bars);
     let pmL='   ', lines=[...Array(T.notes.length).keys()].reverse().map(si=>({si,txt:T.labels[si].padEnd(2)+'|'}));
     bars.forEach(b=>{
-      for(let s=0;s<16;s++){
-        const e=byAbs[b*16+s];
+      for(let s=0;s<meter(st).spb;s++){
+        const e=byAbs[b*meter(st).spb+s];
         pmL+= e&&e.pm ? 'PM ' : '   ';
         lines.forEach(L=>{ const hit=e&&e.pos?e.pos.find(x=>x[0]===L.si):null; L.txt+= hit ? (hit[1]<10?'-'+hit[1]+'-':hit[1]+'-') : '---'; });
       }
@@ -844,11 +897,13 @@ function scheduleIter(t){
   });
   if(state.drums){
     const db=ctx.createGain(); db.gain.value=0.55; db.connect(group);
+    const mt=meter(state), bi=new Map(mt.beats.map((b,i)=>[b,i])), last=mt.beats[mt.beats.length-1];
     for(let s=0;s<r.steps;s++){
-      const q=s%16, tt=t+s*sd+sw(s);
-      if(q===0||q===8||(q===10&&state.busy>0.6)||(q===14&&state.busy>0.8)) drum('kick',db,tt,1);
-      if(q===4||q===12) drum('snare',db,tt,1);
-      if(q%2===0) drum('hat',db,tt,q%4===0?1:0.6);
+      const q=s%mt.spb, tt=t+s*sd+sw(s), i=bi.has(q)?bi.get(q):-1;
+      const odd=mt.beats.length===1;
+      if(i===0||(i>0&&i%2===0&&!(i===mt.beats.length-1&&i>1&&mt.beats.length%2===1))||(state.busy>0.6&&q===last+2&&q<mt.spb&&!bi.has(q))) drum('kick',db,tt,1);
+      if((i>0&&i%2===1)||(i>1&&i===mt.beats.length-1&&mt.beats.length%2===1)||(odd&&q===mt.half&&q>0)) drum('snare',db,tt,1);
+      if(q%2===0) drum('hat',db,tt,i>=0?1:0.6);
     }
   }
   const msTo=x=>Math.max(0,(x-ctx.currentTime)*1000);
@@ -903,7 +958,7 @@ function ensureEdit(){
   return state.edit.events;
 }
 function normalize(){
-  const steps=state.bars*16;
+  const steps=state.bars*meter(state).spb;
   let ev=state.edit.events.filter(e=>e.abs>=0&&e.abs<steps&&e.pitches.length);
   ev.sort((a,b)=>a.abs-b.abs);
   const out=[];
@@ -927,7 +982,7 @@ function addNote(abs,p){
     if(at){ if(at.pitches.includes(p)) return false; if(at.pitches.length>=3){ toast('Three notes at once is the limit'); return false; } at.pitches.push(p); at.pitches.sort((a,b)=>a-b); }
     else {
       const cov=evs.find(e=>e.abs<abs&&e.abs+e.dur>abs);
-      const nxt=evs.filter(e=>e.abs>abs).reduce((m,e)=>Math.min(m,e.abs),state.bars*16);
+      const nxt=evs.filter(e=>e.abs>abs).reduce((m,e)=>Math.min(m,e.abs),state.bars*meter(state).spb);
       let dur=Math.min(2,nxt-abs);
       if(cov){ dur=Math.min(Math.max(dur,cov.abs+cov.dur-abs),4,nxt-abs); cov.dur=abs-cov.abs; }
       evs.push({abs,dur:Math.max(1,dur),pitches:[p],pm:false});
@@ -966,12 +1021,12 @@ function updateTools(){
   pmB.setAttribute('aria-pressed',!!(e&&e.pm));
   document.querySelector('[data-act="fifth"]').setAttribute('aria-pressed',!!(e&&e.pitches.length>1));
   $('editHint').innerHTML = on
-    ? 'Selected <b>'+e.pitches.map(noteName).join('+')+'</b> · bar '+(e.bar+1)+', beat '+(Math.floor(e.s/4)+1)+(e.s%4?' '+['','e','&','a'][e.s%4]:'')+' · '+e.dur+'/16'
+    ? 'Selected <b>'+e.pitches.map(noteName).join('+')+'</b> · bar '+(e.bar+1)+', beat '+meter(state).where(e.s).beat+(meter(state).where(e.s).off?' '+meter(state).label(e.s):'')+' · '+e.dur+'/16'
     : 'Tap an empty spot to add a note. Tap a note to select it.';
 }
 function act(a){
   const e0=selEvent(); if(!e0) return;
-  const steps=state.bars*16;
+  const steps=state.bars*meter(state).spb;
   let snd=null;
   edit(evs=>{
     const e=evs.find(x=>x.abs===sel.abs); if(!e) return false;
@@ -1070,6 +1125,20 @@ function syncUI(){
   document.querySelectorAll('#keys button').forEach((b,i)=>b.setAttribute('aria-pressed',i===st.root));
   $('keyOut').textContent=NAMES[st.root];
   $('scale').value=st.scale;
+  { const sigB=$('sigs'); if(!sigB.children.length){
+      SIG_PRESETS.forEach(([n,d])=>{ const b=document.createElement('button'); b.textContent=n+'/'+d; b.dataset.n=n; b.dataset.d=d; b.onclick=()=>regen(null,()=>{ state.sig={n,d,g:''}; state.sigCustom=false; }); sigB.appendChild(b); });
+      const c=document.createElement('button'); c.textContent='Custom'; c.id='sigCustBtn'; c.onclick=()=>keep(null,()=>{ state.sigCustom=true; }); sigB.appendChild(c);
+      const sn=$('sigN'); for(let i=1;i<=15;i++){ const o=document.createElement('option'); o.value=i; o.textContent=i; sn.appendChild(o); }
+    }
+    [...sigB.children].forEach(b=>{ const on=b.id==='sigCustBtn'?st.sigCustom:(!st.sigCustom&&+b.dataset.n===st.sig.n&&+b.dataset.d===st.sig.d); b.setAttribute('aria-pressed',on); });
+    $('sigCustom').hidden=!st.sigCustom; $('sigN').value=st.sig.n; $('sigD').value=st.sig.d;
+    if(document.activeElement!==$('sigG')) $('sigG').value=st.sig.g||'';
+    const gi=$('sigG').closest('.grp'); gi.hidden=st.sig.d<8;
+    $('sigG').placeholder='e.g. '+defaultGroups(st.sig.n).join('+');
+    const gg=st.sig.g&&!parseGroups(st.sig.g,st.sig.n);
+    $('sigMsg').hidden=!gg; if(gg) $('sigMsg').textContent='Groups must add up to '+st.sig.n+'. Using '+defaultGroups(st.sig.n).join('+')+' for now.';
+    $('sigOut').textContent=sigText(st);
+  }
   $('bpm').value=st.bpm; $('bpmOut').textContent=st.bpm+' BPM';
   $('diss').value=Math.round(st.diss*100); $('dissOut').textContent=Math.round(st.diss*100); $('dissRead').textContent=dissText(st.diss);
   $('busy').value=Math.round(st.busy*100); $('busyOut').textContent=Math.round(st.busy*100);
@@ -1086,6 +1155,9 @@ document.querySelectorAll('#insSeg button').forEach(b=>b.onclick=()=>{ if(state.
 document.querySelectorAll('#barSeg button').forEach(b=>b.onclick=()=>{ if(state.bars===+b.dataset.v) return; regen(null,()=>{ state.bars=+b.dataset.v; }); });
 $('tuning').onchange=e=>keep(null,()=>{ state.tuning[state.instrument]=e.target.value; });
 $('transpose').onchange=e=>keep(null,()=>{ state.transpose[state.instrument]=+e.target.value; });
+$('sigN').onchange=e=>regen(null,()=>{ state.sig.n=+e.target.value; state.sig.g=''; });
+$('sigD').onchange=e=>regen(null,()=>{ state.sig.d=+e.target.value; state.sig.g=''; });
+$('sigG').oninput=e=>regen('sigg',()=>{ state.sig.g=e.target.value.replace(/[^0-9+ ]/g,'').slice(0,24); });
 $('tone').onchange=e=>keep(null,()=>{ state.tone[state.instrument]=e.target.value; });
 $('scale').onchange=e=>regen(null,()=>{ state.scale=e.target.value; });
 $('bpm').oninput=e=>keep('bpm',()=>{ state.bpm=+e.target.value; });
@@ -1173,13 +1245,13 @@ async function aiRiff(mode){
   try{
     const model=await loadAI();
     aiSay('Writing a riff…');
-    const st=state, ins=st.instrument, d=st.diss, cx=st.cx;
+    const st=state, ins=st.instrument, d=st.diss, cx=st.cx, mt=meter(st), SPB=mt.spb, HALF=mt.half;
     const plan=planFor(st.bars,cx);
     const nChunks=Math.max(...plan.map(t=>Math.max(...CHUNKS[t])))+1;
     // seed: the start of a fresh rule-based riff, or your current bar 1
     let base, seedLen;
-    if(mode==='new'){ base=generate(Object.assign({},st,{edit:null,pSeed:newSeed(),rSeed:newSeed()})); seedLen=8; }
-    else { base=riff; seedLen=nChunks>1?16:8; }
+    if(mode==='new'){ base=generate(Object.assign({},st,{edit:null,pSeed:newSeed(),rSeed:newSeed()})); seedLen=HALF; }
+    else { base=riff; seedLen=nChunks>1?SPB:HALF; }
     const seedEv=base.events.filter(e=>e.abs<seedLen);
     if(!seedEv.length) throw new Error('empty');
     const MINP=48, MAXP=83;
@@ -1188,7 +1260,7 @@ async function aiRiff(mode){
     const fold=(p,lo,hi)=>{ while(p<lo) p+=12; while(p>hi) p-=12; return p; };
     const seed={notes:seedEv.map(e=>({pitch:fold(e.pitches[0]+shift,MINP,MAXP),quantizedStartStep:e.abs,quantizedEndStep:Math.min(seedLen,e.abs+e.dur)})),
       quantizationInfo:{stepsPerQuarter:4},totalQuantizedSteps:seedLen};
-    const want=nChunks*16-seedLen;
+    const want=nChunks*SPB-seedLen;
     let notes=seed.notes.map(n=>({s:n.quantizedStartStep,e:n.quantizedEndStep,p:n.pitch-shift}));
     if(want>0){
       const out=await model.continueSequence(seed,want,0.75+0.6*cx);
@@ -1206,27 +1278,28 @@ async function aiRiff(mode){
       if(d>0.5 && Math.random()<(d-0.5)*0.5){ const opts=[1,6,11].map(iv=>{ let q=r0+iv; while(q<p-6) q+=12; return q; }).filter(q=>q>=lo&&q<=hi); if(opts.length) p=opts[Math.floor(Math.random()*opts.length)]; }
       return {s:n.s,e:n.e,p};
     });
-    const chunk=(c,h)=>notes.filter(n=>n.s>=c*16+h*8&&n.s<c*16+h*8+8).map(n=>({s:n.s-c*16,e:Math.min(16,n.e-c*16),p:n.p}));
+    const hs=h=>h?HALF:0, he=h=>h?SPB:HALF;
+    const chunk=(c,h)=>notes.filter(n=>n.s>=c*SPB+hs(h)&&n.s<c*SPB+he(h)).map(n=>({s:n.s-c*SPB,e:Math.min(SPB,n.e-c*SPB),p:n.p}));
     const events=[];
     plan.forEach((t,b)=>{
       const [c0,c1]=CHUNKS[t];
       // in "finish" mode your own bar 1 is kept exactly as it is
-      const keepH=h=>mode==='continue' && [c0,c1][h]===0 && h*8<seedLen;
-      const used=new Array(16).fill(false), keepNotes=[];
-      [0,1].forEach(h=>{ if(keepH(h)) seedEv.filter(e=>e.abs>=h*8&&e.abs<h*8+8).forEach(e=>{ keepNotes.push({abs:b*16+e.abs,dur:e.dur,pitches:[...e.pitches],pm:!!e.pm}); for(let k=e.abs;k<Math.min(16,e.abs+e.dur);k++) used[k]=true; }); });
+      const keepH=h=>mode==='continue' && [c0,c1][h]===0 && hs(h)<seedLen;
+      const used=new Array(SPB).fill(false), keepNotes=[];
+      [0,1].forEach(h=>{ if(keepH(h)) seedEv.filter(e=>e.abs>=hs(h)&&e.abs<he(h)).forEach(e=>{ keepNotes.push({abs:b*SPB+e.abs,dur:e.dur,pitches:[...e.pitches],pm:!!e.pm}); for(let k=e.abs;k<Math.min(SPB,e.abs+e.dur);k++) used[k]=true; }); });
       events.push(...keepNotes);
       const barNotes=[...(keepH(0)?[]:chunk(c0,0)),...(keepH(1)?[]:chunk(c1,1))];
       barNotes.forEach(n=>{ for(let k=n.s;k<n.e;k++) used[k]=true; });
       barNotes.forEach(n=>{
         const pitches=[n.p];
-        if(ins==='guitar' && d<0.4 && n.s%4===0 && n.e-n.s>=2 && Math.random()<0.35) pitches.push(n.p+7);
+        if(ins==='guitar' && d<0.4 && mt.strength(n.s)>=2 && n.e-n.s>=2 && Math.random()<0.35) pitches.push(n.p+7);
         if(ins!=='bass' && d>0.6 && Math.random()<(d-0.6)*0.6) pitches.push(n.p+[1,6,11][Math.floor(Math.random()*3)]);
-        events.push({abs:b*16+n.s,dur:Math.max(1,n.e-n.s),pitches,pm:false});
+        events.push({abs:b*SPB+n.s,dur:Math.max(1,n.e-n.s),pitches,pm:false});
       });
       // riffs chug: fill some gaps with the low root, like the rule generator does
-      if(ins!=='synth') for(let k=0;k<16;k+=2){
-        if(keepH(k<8?0:1)) continue;
-        if(!used[k] && Math.random()<0.25+0.5*st.busy){ events.push({abs:b*16+k,dur:(k+1<16&&!used[k+1])?(Math.random()<0.5?2:1):1,pitches:[R.pedal],pm:ins==='guitar'}); used[k]=true; if(k+1<16) used[k+1]=true; }
+      if(ins!=='synth') for(let k=0;k<SPB;k+=2){
+        if(keepH(k<HALF?0:1)) continue;
+        if(!used[k] && Math.random()<0.25+0.5*st.busy){ events.push({abs:b*SPB+k,dur:(k+1<SPB&&!used[k+1])?(Math.random()<0.5?2:1):1,pitches:[R.pedal],pm:ins==='guitar'}); used[k]=true; if(k+1<SPB) used[k+1]=true; }
       }
     });
     snapshot();
