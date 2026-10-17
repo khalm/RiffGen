@@ -149,6 +149,9 @@ input[type=range]::-moz-range-thumb{width:20px;height:20px;border-radius:50%;bac
 .legend i{flex:0 0 60px;height:6px;border-radius:6px;background:linear-gradient(90deg,var(--accent),var(--heat))}
 .actions{display:flex;gap:8px;flex-wrap:wrap}
 .actions .btn{flex:1 1 auto}
+.btn.ai{background:var(--ink);border-color:var(--ink);color:var(--bg)}
+.btn:disabled{opacity:.5;cursor:progress}
+.aistat{margin:0;font-size:13px;color:var(--muted);padding:8px 10px;border-radius:8px;background:var(--chip)}
 
 .tabwrap{overflow-x:auto;margin-inline:-4px;padding:4px}
 .tab{display:flex;flex-wrap:wrap;gap:16px 10px;font-family:var(--f-mono);font-size:12.5px}
@@ -200,7 +203,7 @@ textarea#fallback{width:100%;height:140px;font-family:var(--f-mono);font-size:12
 </head>
 <body>
 <header class="top">
-  <div class="brand"><h1>Riff<span>Gen</span></h1><span class="ver" id="ver">v1.3.0</span><button class="btn install" id="installBtn" hidden>Install app</button></div>
+  <div class="brand"><h1>Riff<span>Gen</span></h1><span class="ver" id="ver">v1.4.0</span><button class="btn install" id="installBtn" hidden>Install app</button></div>
   <p class="ihint" id="installHint" hidden></p>
   <p>Original riffs for guitar, bass and synth. Pick a key, set how much it bites, and press play.</p>
 </header>
@@ -275,6 +278,11 @@ textarea#fallback{width:100%;height:140px;font-family:var(--f-mono);font-size:12
       <button class="btn" id="newRhythm">New rhythm</button>
       <button class="btn" id="editBtn" aria-pressed="false">Edit notes</button>
     </div>
+    <div class="actions">
+      <button class="btn ai" id="aiNew">✦ AI riff</button>
+      <button class="btn" id="aiCont">✦ AI: finish from bar 1</button>
+    </div>
+    <p class="aistat" id="aiStat" hidden></p>
     <div class="editbar" id="editbar" hidden>
       <p class="hint" id="editHint"></p>
       <div class="tools" id="tools">
@@ -310,7 +318,7 @@ textarea#fallback{width:100%;height:140px;font-family:var(--f-mono);font-size:12
     </div>
   </section>
 </main>
-<p class="foot">RiffGen <span id="ver2">v1.3.0</span> · Everything is generated and played in your browser. Free, no account.</p>
+<p class="foot">RiffGen <span id="ver2">v1.4.0</span> · Everything is generated and played in your browser. Free, no account.</p>
 
 <div class="transport"><div class="tin">
   <button class="play" id="play" aria-pressed="false"><svg viewBox="0 0 20 20" id="playIcon"><path d="M5 3l12 7-12 7z"/></svg><span id="playTxt">Play</span></button>
@@ -321,7 +329,7 @@ textarea#fallback{width:100%;height:140px;font-family:var(--f-mono);font-size:12
 <div class="toast" id="toast" role="status"></div>
 
 <script>
-const VERSION = '1.3.0';
+const VERSION = '1.4.0';
 document.getElementById('ver').textContent = 'v' + VERSION;
 document.getElementById('ver2').textContent = 'v' + VERSION;
 
@@ -426,7 +434,7 @@ function sanitize(o){
   if(o.edit&&Array.isArray(o.edit.events)){
     const ev=o.edit.events.filter(e=>e&&Number.isInteger(e.abs)&&e.abs>=0&&e.abs<128&&Number.isInteger(e.dur)&&e.dur>=1&&e.dur<=128&&Array.isArray(e.pitches)&&e.pitches.length>=1&&e.pitches.length<=3&&e.pitches.every(p=>Number.isInteger(p)&&p>=12&&p<=108)).slice(0,256)
       .map(e=>({abs:e.abs,dur:e.dur,pitches:[...e.pitches],pm:!!e.pm}));
-    s.edit={events:ev};
+    s.edit={events:ev}; if(o.edit.src==='ai') s.edit.src='ai';
   }
   if(Number.isInteger(o.rSeed)) s.rSeed=o.rSeed;
   if(Number.isInteger(o.pSeed)) s.pSeed=o.pSeed;
@@ -595,6 +603,7 @@ function dissText(d){
 function render(){
   riff=state.edit?fromEdit(state):generate(state);
   $('editedTag').hidden=!state.edit; $('revert').hidden=!state.edit;
+  $('editedTag').textContent = state.edit&&state.edit.src==='ai' ? 'AI riff' : 'Edited';
   const st=state;
   $('riffTitle').textContent = NAMES[st.root]+' '+st.scale.replace(/ \(.*\)/,'');
   const tn = riff.tun ? riff.tun.name+' · ' : TONES.synth[st.tone.synth]+' · ';
@@ -906,6 +915,7 @@ function evAt(abs){ return state.edit?state.edit.events.find(e=>e.abs===abs):nul
 function edit(fn){
   snapshot();
   const evs=ensureEdit();
+  delete state.edit.src;
   const r=fn(evs);
   if(r===false){ undoStack.pop(); updateUndo(); return; }
   normalize(); render(); persist(); updateUndo();
@@ -1136,6 +1146,100 @@ try{ matchMedia('(prefers-color-scheme: dark)').addEventListener('change',()=>{ 
 new MutationObserver(()=>{ drawRoll(); renderTab(); }).observe(document.documentElement,{attributes:true,attributeFilter:['data-theme']});
 let rz; addEventListener('resize',()=>{ clearTimeout(rz); rz=setTimeout(drawRoll,120); });
 document.addEventListener('visibilitychange',()=>{ if(document.hidden&&playing) stop(); });
+
+/* ---------- AI: Google Magenta melody model (trained on real music), runs on the phone ---------- */
+const HOSTED=!!document.querySelector('link[rel="manifest"]');
+const MM_URLS=['https://cdn.jsdelivr.net/npm/@magenta/music@1.23.1/dist/magentamusic.min.js','https://cdn.jsdelivr.net/npm/@magenta/music@1.23.1/dist/magentamusic.js','https://cdn.jsdelivr.net/npm/@magenta/music@1.23.1'];
+const CKPT='https://storage.googleapis.com/magentadata/js/checkpoints/music_rnn/';
+let aiModel=null, aiBusy=false;
+function aiSay(msg){ const el=$('aiStat'); el.hidden=!msg; el.textContent=msg||''; }
+function loadScript(u){ return new Promise((ok,no)=>{ const sc=document.createElement('script'); sc.src=u; sc.onload=ok; sc.onerror=no; document.head.appendChild(sc); }); }
+async function loadAI(){
+  if(aiModel) return aiModel;
+  if(!window.mm){ for(const u of MM_URLS){ try{ await loadScript(u); if(window.mm&&window.mm.MusicRNN) break; }catch(e){} } }
+  if(!window.mm||!window.mm.MusicRNN) throw new Error('library');
+  let last=null;
+  for(const name of ['melody_rnn','basic_rnn']){
+    try{ const m=new mm.MusicRNN(CKPT+name); await m.initialize(); aiModel=m; return m; }catch(e){ last=e; }
+  }
+  throw last||new Error('model');
+}
+const CHUNKS={A:[0,0],A2:[0,1],B:[1,1],C:[2,2],B2:[1,3],D:[3,3]};
+async function aiRiff(mode){
+  if(aiBusy) return;
+  if(!HOSTED){ aiSay('The AI model downloads from Google, which this preview blocks. Open RiffGen from its GitHub Pages link or the installed app to use AI.'); return; }
+  aiBusy=true; $('aiNew').disabled=true; $('aiCont').disabled=true;
+  aiSay(aiModel?'Writing a riff…':'Loading the AI model (a few MB the first time, then it works offline)…');
+  try{
+    const model=await loadAI();
+    aiSay('Writing a riff…');
+    const st=state, ins=st.instrument, d=st.diss, cx=st.cx;
+    const plan=planFor(st.bars,cx);
+    const nChunks=Math.max(...plan.map(t=>Math.max(...CHUNKS[t])))+1;
+    // seed: the start of a fresh rule-based riff, or your current bar 1
+    let base, seedLen;
+    if(mode==='new'){ base=generate(Object.assign({},st,{edit:null,pSeed:newSeed(),rSeed:newSeed()})); seedLen=8; }
+    else { base=riff; seedLen=nChunks>1?16:8; }
+    const seedEv=base.events.filter(e=>e.abs<seedLen);
+    if(!seedEv.length) throw new Error('empty');
+    const MINP=48, MAXP=83;
+    const lowest=Math.min(...seedEv.map(e=>e.pitches[0]));
+    const shift=lowest<MINP?12*Math.ceil((MINP-lowest)/12):0;
+    const fold=(p,lo,hi)=>{ while(p<lo) p+=12; while(p>hi) p-=12; return p; };
+    const seed={notes:seedEv.map(e=>({pitch:fold(e.pitches[0]+shift,MINP,MAXP),quantizedStartStep:e.abs,quantizedEndStep:Math.min(seedLen,e.abs+e.dur)})),
+      quantizationInfo:{stepsPerQuarter:4},totalQuantizedSteps:seedLen};
+    const want=nChunks*16-seedLen;
+    let notes=seed.notes.map(n=>({s:n.quantizedStartStep,e:n.quantizedEndStep,p:n.pitch-shift}));
+    if(want>0){
+      const out=await model.continueSequence(seed,want,0.75+0.6*cx);
+      const on=(out.notes||[]).map(n=>({s:n.quantizedStartStep|0,e:n.quantizedEndStep|0,p:n.pitch-shift}));
+      const off=on.length&&Math.min(...on.map(n=>n.s))>=seedLen?0:seedLen;
+      on.forEach(n=>notes.push({s:n.s+off,e:Math.max(n.s+off+1,n.e+off),p:n.p}));
+    }
+    // fit to the instrument and the key, with the dissonance slider deciding how strict
+    const R=ranges(st), r0=R.r0;
+    const lo= ins==='synth'?r0-5:Math.min(...R.tun.notes), hi= ins==='synth'?r0+19:r0+(ins==='bass'?12:17)+Math.round(cx*5);
+    const sc=SCALES[st.scale], rel=p=>((p-st.root)%12+12)%12;
+    notes=notes.map(n=>{
+      let p=fold(n.p,lo,hi);
+      if(!sc.includes(rel(p)) && Math.random()>d*0.8){ for(const dd of [-1,1,-2,2]){ if(sc.includes(rel(p+dd))){ p+=dd; break; } } }
+      if(d>0.5 && Math.random()<(d-0.5)*0.5){ const opts=[1,6,11].map(iv=>{ let q=r0+iv; while(q<p-6) q+=12; return q; }).filter(q=>q>=lo&&q<=hi); if(opts.length) p=opts[Math.floor(Math.random()*opts.length)]; }
+      return {s:n.s,e:n.e,p};
+    });
+    const chunk=(c,h)=>notes.filter(n=>n.s>=c*16+h*8&&n.s<c*16+h*8+8).map(n=>({s:n.s-c*16,e:Math.min(16,n.e-c*16),p:n.p}));
+    const events=[];
+    plan.forEach((t,b)=>{
+      const [c0,c1]=CHUNKS[t];
+      // in "finish" mode your own bar 1 is kept exactly as it is
+      const keepH=h=>mode==='continue' && [c0,c1][h]===0 && h*8<seedLen;
+      const used=new Array(16).fill(false), keepNotes=[];
+      [0,1].forEach(h=>{ if(keepH(h)) seedEv.filter(e=>e.abs>=h*8&&e.abs<h*8+8).forEach(e=>{ keepNotes.push({abs:b*16+e.abs,dur:e.dur,pitches:[...e.pitches],pm:!!e.pm}); for(let k=e.abs;k<Math.min(16,e.abs+e.dur);k++) used[k]=true; }); });
+      events.push(...keepNotes);
+      const barNotes=[...(keepH(0)?[]:chunk(c0,0)),...(keepH(1)?[]:chunk(c1,1))];
+      barNotes.forEach(n=>{ for(let k=n.s;k<n.e;k++) used[k]=true; });
+      barNotes.forEach(n=>{
+        const pitches=[n.p];
+        if(ins==='guitar' && d<0.4 && n.s%4===0 && n.e-n.s>=2 && Math.random()<0.35) pitches.push(n.p+7);
+        if(ins!=='bass' && d>0.6 && Math.random()<(d-0.6)*0.6) pitches.push(n.p+[1,6,11][Math.floor(Math.random()*3)]);
+        events.push({abs:b*16+n.s,dur:Math.max(1,n.e-n.s),pitches,pm:false});
+      });
+      // riffs chug: fill some gaps with the low root, like the rule generator does
+      if(ins!=='synth') for(let k=0;k<16;k+=2){
+        if(keepH(k<8?0:1)) continue;
+        if(!used[k] && Math.random()<0.25+0.5*st.busy){ events.push({abs:b*16+k,dur:(k+1<16&&!used[k+1])?(Math.random()<0.5?2:1):1,pitches:[R.pedal],pm:ins==='guitar'}); used[k]=true; if(k+1<16) used[k+1]=true; }
+      }
+    });
+    snapshot();
+    state.edit={events,src:'ai'}; normalize(); sel=null;
+    changed(false); updateUndo();
+    aiSay(''); toast('AI riff ready','Undo',undo);
+    if(playing) start();
+  }catch(e){
+    aiSay(e&&e.message==='library' ? 'Couldn\u2019t load the AI. Check your internet connection and try again.' : 'The AI model didn\u2019t load. Check your connection and try again. The normal generator still works.');
+  }finally{ aiBusy=false; $('aiNew').disabled=false; $('aiCont').disabled=false; }
+}
+$('aiNew').onclick=()=>aiRiff('new');
+$('aiCont').onclick=()=>aiRiff('continue');
 
 /* ---------- install as an app (works on the GitHub Pages version) ---------- */
 (function(){

@@ -2,7 +2,7 @@
 
 Generates new, original riffs for guitar, bass or synth — right in the browser. Free, no account, no server.
 
-**Version:** 1.3.0 (shown on the front page)
+**Version:** 1.4.0 (shown on the front page)
 
 ## Features
 - Guitar, bass or synth, each with its own tones (clean/crunch/high gain, fingers/pick/fuzz, saw/pluck/acid)
@@ -11,6 +11,7 @@ Generates new, original riffs for guitar, bass or synth — right in the browser
 - Length (1, 2, 4 or 8 bars) and tempo (60–220 BPM, tap tempo)
 - **Dissonance** slider: from roots and power chords to tritones and minor-second clusters
 - **Complexity** slider: from repeating, simple riffs to odd accents, wide leaps and more varied bars
+- **AI riffs:** uses Google Magenta's free melody model (trained on real music, runs on the phone). "AI riff" writes a new riff; "AI: finish from bar 1" keeps your first bar and lets the AI write the rest. Key, dissonance, complexity and busyness still shape the result. The model is cached after the first load so it works offline.
 - Busyness, swing, drums and loop
 - Audio playback (Web Audio, plucked-string synthesis), piano roll, and guitar/bass tab with palm-mute marks
 - **Note editor:** tap the piano roll or the tab to add notes, tap a note to select it, then move it, change pitch or length, add a fifth, palm-mute or delete it
