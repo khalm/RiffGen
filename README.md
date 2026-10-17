@@ -2,7 +2,7 @@
 
 Generates new, original riffs for guitar, bass or synth — right in the browser. Free, no account, no server.
 
-**Version:** 1.2.0 (shown on the front page)
+**Version:** 1.2.1 (shown on the front page)
 
 ## Features
 - Guitar, bass or synth, each with its own tones (clean/crunch/high gain, fingers/pick/fuzz, saw/pluck/acid)

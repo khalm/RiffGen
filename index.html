@@ -192,7 +192,7 @@ textarea#fallback{width:100%;height:140px;font-family:var(--f-mono);font-size:12
 </head>
 <body>
 <header class="top">
-  <div class="brand"><h1>Riff<span>Gen</span></h1><span class="ver" id="ver">v1.2.0</span></div>
+  <div class="brand"><h1>Riff<span>Gen</span></h1><span class="ver" id="ver">v1.2.1</span></div>
   <p>Original riffs for guitar, bass and synth. Pick a key, set how much it bites, and press play.</p>
 </header>
 
@@ -301,7 +301,7 @@ textarea#fallback{width:100%;height:140px;font-family:var(--f-mono);font-size:12
     </div>
   </section>
 </main>
-<p class="foot">RiffGen <span id="ver2">v1.2.0</span> · Everything is generated and played in your browser. Free, no account.</p>
+<p class="foot">RiffGen <span id="ver2">v1.2.1</span> · Everything is generated and played in your browser. Free, no account.</p>
 
 <div class="transport"><div class="tin">
   <button class="play" id="play" aria-pressed="false"><svg viewBox="0 0 20 20" id="playIcon"><path d="M5 3l12 7-12 7z"/></svg><span id="playTxt">Play</span></button>
@@ -312,7 +312,7 @@ textarea#fallback{width:100%;height:140px;font-family:var(--f-mono);font-size:12
 <div class="toast" id="toast" role="status"></div>
 
 <script>
-const VERSION = '1.2.0';
+const VERSION = '1.2.1';
 document.getElementById('ver').textContent = 'v' + VERSION;
 document.getElementById('ver2').textContent = 'v' + VERSION;
 
@@ -349,7 +349,7 @@ const TUNINGS = {
 };
 // older saved riffs used fixed tunings; map them to shape + transpose
 const LEGACY = {guitar:{ebstd:['std',-1],dstd:['std',-2],dropc:['dropd',-2],dropb:['dropd',-3]},bass:{ebstd:['std4',-1],dstd:['std4',-2],dropc:['dropd',-2]}};
-const TRANSPOSE = [[2,'Up 1 step (2 semitones)'],[1,'Up ½ step (1 semitone)'],[0,'None, standard pitch'],[-1,'Down ½ step (1 semitone)'],[-2,'Down 1 step (2 semitones)'],[-3,'Down 1½ steps (3 semitones)'],[-4,'Down 2 steps (4 semitones)'],[-5,'Down 2½ steps (5 semitones)'],[-6,'Down 3 steps (6 semitones)'],[-7,'Down 3½ steps (7 semitones)']];
+const TRANSPOSE = [[2,'+2 semitones'],[1,'+1 semitone'],[0,'0 semitones'],[-1,'−1 semitone'],[-2,'−2 semitones'],[-3,'−3 semitones'],[-4,'−4 semitones'],[-5,'−5 semitones'],[-6,'−6 semitones'],[-7,'−7 semitones']];
 const TONES = {guitar:{clean:'Clean',crunch:'Crunch',heavy:'High gain'},bass:{finger:'Fingers',pick:'Pick',fuzz:'Fuzz'},synth:{saw:'Saw stack',pluck:'Square pluck',acid:'Acid'}};
 function planFor(bars,cx){
   if(bars===1) return ['A'];
