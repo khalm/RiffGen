@@ -192,7 +192,7 @@ textarea#fallback{width:100%;height:140px;font-family:var(--f-mono);font-size:12
 </head>
 <body>
 <header class="top">
-  <div class="brand"><h1>Riff<span>Gen</span></h1><span class="ver" id="ver">v1.2.1</span></div>
+  <div class="brand"><h1>Riff<span>Gen</span></h1><span class="ver" id="ver">v1.2.2</span></div>
   <p>Original riffs for guitar, bass and synth. Pick a key, set how much it bites, and press play.</p>
 </header>
 
@@ -301,7 +301,7 @@ textarea#fallback{width:100%;height:140px;font-family:var(--f-mono);font-size:12
     </div>
   </section>
 </main>
-<p class="foot">RiffGen <span id="ver2">v1.2.1</span> · Everything is generated and played in your browser. Free, no account.</p>
+<p class="foot">RiffGen <span id="ver2">v1.2.2</span> · Everything is generated and played in your browser. Free, no account.</p>
 
 <div class="transport"><div class="tin">
   <button class="play" id="play" aria-pressed="false"><svg viewBox="0 0 20 20" id="playIcon"><path d="M5 3l12 7-12 7z"/></svg><span id="playTxt">Play</span></button>
@@ -312,7 +312,7 @@ textarea#fallback{width:100%;height:140px;font-family:var(--f-mono);font-size:12
 <div class="toast" id="toast" role="status"></div>
 
 <script>
-const VERSION = '1.2.1';
+const VERSION = '1.2.2';
 document.getElementById('ver').textContent = 'v' + VERSION;
 document.getElementById('ver2').textContent = 'v' + VERSION;
 
@@ -349,7 +349,7 @@ const TUNINGS = {
 };
 // older saved riffs used fixed tunings; map them to shape + transpose
 const LEGACY = {guitar:{ebstd:['std',-1],dstd:['std',-2],dropc:['dropd',-2],dropb:['dropd',-3]},bass:{ebstd:['std4',-1],dstd:['std4',-2],dropc:['dropd',-2]}};
-const TRANSPOSE = [[2,'+2 semitones'],[1,'+1 semitone'],[0,'0 semitones'],[-1,'−1 semitone'],[-2,'−2 semitones'],[-3,'−3 semitones'],[-4,'−4 semitones'],[-5,'−5 semitones'],[-6,'−6 semitones'],[-7,'−7 semitones']];
+const TRANSPOSE = [[0,'0 semitones'],[-1,'−1 semitone'],[-2,'−2 semitones'],[-3,'−3 semitones'],[-4,'−4 semitones'],[-5,'−5 semitones'],[-6,'−6 semitones'],[-7,'−7 semitones'],[-8,'−8 semitones'],[-9,'−9 semitones'],[-10,'−10 semitones'],[-11,'−11 semitones'],[-12,'−12 semitones'],[1,'+1 semitone'],[2,'+2 semitones']];
 const TONES = {guitar:{clean:'Clean',crunch:'Crunch',heavy:'High gain'},bass:{finger:'Fingers',pick:'Pick',fuzz:'Fuzz'},synth:{saw:'Saw stack',pluck:'Square pluck',acid:'Acid'}};
 function planFor(bars,cx){
   if(bars===1) return ['A'];
@@ -400,7 +400,7 @@ function sanitize(o){
   if(['guitar','bass','synth'].includes(o.instrument)) s.instrument=o.instrument;
   for(const k of ['guitar','bass']){
     const tu=o.tuning&&o.tuning[k], tr=o.transpose&&o.transpose[k];
-    if(Number.isInteger(tr)&&tr>=-7&&tr<=2) s.transpose[k]=tr;
+    if(Number.isInteger(tr)&&tr>=-12&&tr<=2) s.transpose[k]=tr;
     if(TUNINGS[k][tu]) s.tuning[k]=tu;
     else if(LEGACY[k][tu]){ s.tuning[k]=LEGACY[k][tu][0]; s.transpose[k]=LEGACY[k][tu][1]; }
   }
@@ -1029,7 +1029,8 @@ function syncUI(){
   $('transField').hidden=!isStr||isCustom; $('tuneRead').hidden=!isStr;
   if(isStr){
     fillSelect($('tuning'),TUNINGS[st.instrument],st.tuning[st.instrument],v=>v.name);
-    fillSelect($('transpose'),Object.fromEntries(TRANSPOSE.map(([v,l])=>[String(v),l])),String(st.transpose[st.instrument]));
+    const tsel=$('transpose'); tsel.innerHTML='';
+    TRANSPOSE.forEach(([v,l])=>{ const o=document.createElement('option'); o.value=v; o.textContent=l; if(v===st.transpose[st.instrument]) o.selected=true; tsel.appendChild(o); });
     const T=getTun(st.instrument,st), r=$('tuneRead'); r.innerHTML='';
     const b=document.createElement('b'); b.textContent=T.name;
     const sp=document.createElement('span'); sp.textContent=T.desc+' · '+T.notes.map(noteName).join(' ');
