@@ -2,7 +2,7 @@
 
 Generates new, original riffs for guitar, bass or synth — right in the browser. Free, no account, no server.
 
-**Version:** 1.2.2 (shown on the front page)
+**Version:** 1.3.0 (shown on the front page)
 
 ## Features
 - Guitar, bass or synth, each with its own tones (clean/crunch/high gain, fingers/pick/fuzz, saw/pluck/acid)
@@ -16,6 +16,9 @@ Generates new, original riffs for guitar, bass or synth — right in the browser
 - **Note editor:** tap the piano roll or the tab to add notes, tap a note to select it, then move it, change pitch or length, add a fifth, palm-mute or delete it
 - Undo / redo for every change; changing the key transposes your edits
 - New riff / new notes / new rhythm, save riffs, share riff codes, copy tab as text
+
+## Install as an app
+Open the GitHub Pages link in Chrome on your phone and tap **Install app** at the top (or ⋮ → Install app). Once installed it opens full screen and works offline.
 
 ## Run
 Open `index.html`, or turn on GitHub Pages (Settings → Pages → Deploy from branch → `main` / root).
