@@ -104,7 +104,35 @@ input[type=range]::-moz-range-thumb{width:20px;height:20px;border-radius:50%;bac
 .seed{font-family:var(--f-mono);font-size:11px;color:var(--muted);background:var(--chip);padding:4px 8px;border-radius:6px}
 
 .roll-wrap{position:relative;border-radius:10px;overflow:hidden;background:var(--bg);border:1px solid var(--line)}
-#roll{display:block;width:100%;height:150px}
+.roll-wrap.editing{overflow:auto;max-height:min(400px,55vh);overscroll-behavior:contain}
+.roll-inner{display:flex;position:relative;min-width:0}
+.rcan{position:relative;flex:1;min-width:0}
+.editing .rcan{flex:none}
+#roll{display:block;width:100%;height:150px;cursor:pointer;touch-action:manipulation}
+.rlabels{position:sticky;left:0;z-index:2;background:var(--surface);border-right:1px solid var(--line);flex:none;width:42px}
+.rlabels div{font-family:var(--f-mono);font-size:10px;display:flex;align-items:center;justify-content:flex-end;padding-right:5px;color:var(--muted)}
+.rlabels .sc{color:var(--ink)}
+.rlabels .root{color:var(--accent);font-weight:700}
+.editbar{display:flex;flex-direction:column;gap:8px;position:sticky;bottom:calc(84px + env(safe-area-inset-bottom, 0px));z-index:5;background:var(--surface);padding:10px;border:1px solid var(--line);border-radius:12px;box-shadow:0 6px 18px rgba(0,0,0,.12)}
+.hint{margin:0;font-size:13px;color:var(--muted)}
+.hint b{color:var(--ink);font-family:var(--f-mono)}
+.tools{display:grid;grid-template-columns:repeat(9,minmax(0,1fr));gap:4px}
+.tools button{height:44px;border:1px solid var(--line);background:var(--surface);border-radius:8px;font-weight:700;font-size:13px;padding:0}
+.tools button:disabled{opacity:.3;cursor:default}
+.tools button[aria-pressed="true"]{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+.tools .danger{color:var(--heat)}
+.btn[aria-pressed="true"]{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+.edited{display:flex;gap:6px;align-items:center}
+.edited span{font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--on-accent);background:var(--accent);padding:4px 8px;border-radius:6px}
+.edited button{border:0;background:transparent;color:var(--accent);font-weight:600;font-size:13px;padding:4px}
+.editing-tab .col:not(.lab){cursor:pointer}
+.col.sel{outline:2px solid var(--accent);outline-offset:-1px}
+.cell .f.fsel{background:var(--accent)!important;color:var(--on-accent)!important;border-radius:3px;padding:1px 2px}
+.nchip{cursor:pointer;border:0}
+.nchip.sel{outline:2px solid var(--accent)}
+.tin .icon{width:48px;padding:0;display:flex;align-items:center;justify-content:center}
+.tin .icon svg{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.tin .icon:disabled{opacity:.35}
 .ph{position:absolute;top:0;bottom:0;width:2px;background:var(--gold);left:0;pointer-events:none}
 .legend{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--muted)}
 .legend i{flex:0 0 60px;height:6px;border-radius:6px;background:linear-gradient(90deg,var(--accent),var(--heat))}
@@ -151,8 +179,9 @@ textarea#fallback{width:100%;height:140px;font-family:var(--f-mono);font-size:12
 .play[aria-pressed="true"]{background:var(--heat);color:#fff}
 .play svg{width:20px;height:20px;fill:currentColor}
 .tin .btn{height:54px;border-radius:12px;padding:0 18px}
-.toast{position:fixed;left:50%;bottom:calc(90px + env(safe-area-inset-bottom, 0px));transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:9px 16px;border-radius:999px;font-size:14px;font-weight:500;z-index:30;opacity:0;pointer-events:none;transition:opacity .2s}
-.toast.show{opacity:1}
+.toast{position:fixed;left:50%;bottom:calc(90px + env(safe-area-inset-bottom, 0px));transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:9px 16px;border-radius:999px;font-size:14px;font-weight:500;z-index:30;opacity:0;pointer-events:none;transition:opacity .2s;display:flex;gap:12px;align-items:center;max-width:calc(100vw - 32px)}
+.toast.show{opacity:1;pointer-events:auto}
+.toast button{border:0;background:transparent;color:var(--gold);font-weight:700;padding:0}
 @media (prefers-reduced-motion: reduce){*{transition:none!important}}
 </style>
 
@@ -160,7 +189,7 @@ textarea#fallback{width:100%;height:140px;font-family:var(--f-mono);font-size:12
 </head>
 <body>
 <header class="top">
-  <div class="brand"><h1>Riff<span>Gen</span></h1><span class="ver" id="ver">v1.0.0</span></div>
+  <div class="brand"><h1>Riff<span>Gen</span></h1><span class="ver" id="ver">v1.1.0</span></div>
   <p>Original riffs for guitar, bass and synth. Pick a key, set how much it bites, and press play.</p>
 </header>
 
@@ -222,14 +251,29 @@ textarea#fallback{width:100%;height:140px;font-family:var(--f-mono);font-size:12
   <section class="panel output" aria-label="Riff">
     <div class="out-head">
       <div><h2 id="riffTitle">E Minor</h2><p id="riffMeta"></p></div>
-      <span class="seed" id="seedChip"></span>
+      <div class="edited"><span id="editedTag" hidden>Edited</span><button id="revert" hidden>Back to generated</button><span class="seed" id="seedChip"></span></div>
     </div>
-    <div class="roll-wrap"><canvas id="roll"></canvas><div class="ph" id="ph" hidden></div></div>
+    <div class="roll-wrap" id="rollWrap"><div class="roll-inner"><div class="rlabels" id="rlabels" hidden></div><div class="rcan"><canvas id="roll" aria-label="Piano roll"></canvas><div class="ph" id="ph" hidden></div></div></div></div>
     <div class="legend"><span>Note colour:</span><span>consonant</span><i></i><span>dissonant</span></div>
     <div class="actions">
       <button class="btn primary" id="newRiff">New riff</button>
       <button class="btn" id="newNotes">New notes</button>
       <button class="btn" id="newRhythm">New rhythm</button>
+      <button class="btn" id="editBtn" aria-pressed="false">Edit notes</button>
+    </div>
+    <div class="editbar" id="editbar" hidden>
+      <p class="hint" id="editHint"></p>
+      <div class="tools" id="tools">
+        <button data-act="left" aria-label="Move earlier">◀</button>
+        <button data-act="right" aria-label="Move later">▶</button>
+        <button data-act="up" aria-label="Pitch up a semitone">▲</button>
+        <button data-act="down" aria-label="Pitch down a semitone">▼</button>
+        <button data-act="shorter" aria-label="Shorter">−</button>
+        <button data-act="longer" aria-label="Longer">+</button>
+        <button data-act="fifth" aria-label="Add or remove a fifth (power chord)">5th</button>
+        <button data-act="pm" aria-label="Palm mute">PM</button>
+        <button data-act="del" class="danger" aria-label="Delete note">✕</button>
+      </div>
     </div>
     <div class="lbl" id="tabLbl">Tab</div>
     <div class="tabwrap"><div class="tab" id="tab"></div></div>
@@ -252,16 +296,18 @@ textarea#fallback{width:100%;height:140px;font-family:var(--f-mono);font-size:12
     </div>
   </section>
 </main>
-<p class="foot">RiffGen <span id="ver2">v1.0.0</span> · Everything is generated and played in your browser. Free, no account.</p>
+<p class="foot">RiffGen <span id="ver2">v1.1.0</span> · Everything is generated and played in your browser. Free, no account.</p>
 
 <div class="transport"><div class="tin">
   <button class="play" id="play" aria-pressed="false"><svg viewBox="0 0 20 20" id="playIcon"><path d="M5 3l12 7-12 7z"/></svg><span id="playTxt">Play</span></button>
+  <button class="btn icon" id="undo" aria-label="Undo" disabled><svg viewBox="0 0 24 24"><path d="M9 14L4 9l5-5"/><path d="M4 9h10a6 6 0 010 12h-3"/></svg></button>
+  <button class="btn icon" id="redo" aria-label="Redo" disabled><svg viewBox="0 0 24 24"><path d="M15 14l5-5-5-5"/><path d="M20 9H10a6 6 0 000 12h3"/></svg></button>
   <button class="btn" id="newRiff2">New riff</button>
 </div></div>
 <div class="toast" id="toast" role="status"></div>
 
 <script>
-const VERSION = '1.0.0';
+const VERSION = '1.1.0';
 document.getElementById('ver').textContent = 'v' + VERSION;
 document.getElementById('ver2').textContent = 'v' + VERSION;
 
@@ -331,7 +377,7 @@ const newSeed = () => { try { const a=new Uint32Array(1); crypto.getRandomValues
 
 /* ---------- state ---------- */
 const DEFAULTS = {instrument:'guitar',tuning:{guitar:'std',bass:'std4'},tone:{guitar:'crunch',bass:'finger',synth:'saw'},
-  root:4,scale:'Minor (Aeolian)',bars:4,bpm:140,diss:0.3,busy:0.55,cx:0.45,custom:{guitar:[40,45,50,55,59,64],bass:[28,33,38,43]},swing:false,drums:true,loop:true,rSeed:4127,pSeed:90211};
+  root:4,scale:'Minor (Aeolian)',bars:4,bpm:140,diss:0.3,busy:0.55,cx:0.45,custom:{guitar:[40,45,50,55,59,64],bass:[28,33,38,43]},swing:false,drums:true,loop:true,rSeed:4127,pSeed:90211,edit:null};
 function sanitize(o){
   const s = JSON.parse(JSON.stringify(DEFAULTS));
   if(!o||typeof o!=='object') return s;
@@ -347,6 +393,11 @@ function sanitize(o){
   if(o.cx>=0&&o.cx<=1) s.cx=o.cx;
   if(o.custom) for(const k of ['guitar','bass']){ const a=o.custom[k]; if(Array.isArray(a)&&a.length>=4&&a.length<=7&&a.every(n=>Number.isInteger(n)&&n>=RANGE[k][0]&&n<=RANGE[k][1])) s.custom[k]=a; }
   for(const k of ['swing','drums','loop']) if(typeof o[k]==='boolean') s[k]=o[k];
+  if(o.edit&&Array.isArray(o.edit.events)){
+    const ev=o.edit.events.filter(e=>e&&Number.isInteger(e.abs)&&e.abs>=0&&e.abs<128&&Number.isInteger(e.dur)&&e.dur>=1&&e.dur<=128&&Array.isArray(e.pitches)&&e.pitches.length>=1&&e.pitches.length<=3&&e.pitches.every(p=>Number.isInteger(p)&&p>=12&&p<=108)).slice(0,256)
+      .map(e=>({abs:e.abs,dur:e.dur,pitches:[...e.pitches],pm:!!e.pm}));
+    s.edit={events:ev};
+  }
   if(Number.isInteger(o.rSeed)) s.rSeed=o.rSeed;
   if(Number.isInteger(o.pSeed)) s.pSeed=o.pSeed;
   return s;
@@ -426,14 +477,37 @@ function generate(st){
     last.pitches = (ins==='guitar' && tgt===r0 && d<0.3) ? [tgt,tgt+7] : [tgt];
     last.pm=false;
   }
+  return finish(events,st,tun,r0);
+}
+
+function finish(events,st,tun,r0){
+  const tens=p=>1-CONS[((p-st.root)%12+12)%12];
   events.forEach(e=>{
     let t=Math.max(...e.pitches.map(tens));
-    if(e.pitches.length>1){ const iv=e.pitches[1]-e.pitches[0]; t=Math.max(t, iv%12===0?0:1-CONS[iv%12]); }
+    if(e.pitches.length>1){ const iv=Math.abs(e.pitches[1]-e.pitches[0]); t=Math.max(t, iv%12===0?0:1-CONS[iv%12]); }
     e.t=t;
   });
   if(tun) finger(events,tun.notes);
   const all=events.flatMap(e=>e.pitches);
-  return {events,steps:st.bars*16,r0,tun,lo:Math.min(...all),hi:Math.max(...all),ins};
+  return {events,steps:st.bars*16,r0,tun,lo:all.length?Math.min(...all):r0,hi:all.length?Math.max(...all):r0+12,ins:st.instrument};
+}
+
+/* playable range for the instrument (used by the editor) */
+function ranges(st){
+  const ins=st.instrument, tun=getTun(ins,st);
+  if(ins==='synth'){ const r0=48+st.root; return {tun,r0,pedal:r0-12,vMin:r0-12,vMax:r0+26}; }
+  const lo=Math.min(...tun.notes), r0=lo+((st.root-(lo%12)+120)%12);
+  return {tun,r0,pedal:r0,vMin:lo,vMax:Math.max(...tun.notes)+(ins==='bass'?14:17)};
+}
+
+function fromEdit(st){
+  const R=ranges(st), steps=st.bars*16, tun=R.tun, low=tun?Math.min(...tun.notes):0;
+  const events=st.edit.events.filter(e=>e.abs<steps).map(e=>{
+    const pitches=e.pitches.map(p=>{ while(tun&&p<low) p+=12; return p; });
+    const s=e.abs%16;
+    return {bar:Math.floor(e.abs/16),s,abs:e.abs,dur:Math.min(e.dur,steps-e.abs),pitches,pm:!!e.pm&&st.instrument==='guitar',ped:pitches[0]===R.pedal,vel:s%4===0?1:s%2===0?0.85:0.75};
+  });
+  return finish(events,st,tun,R.r0);
 }
 
 /* choose strings and frets that keep the hand in one place */
@@ -489,34 +563,61 @@ function dissText(d){
 }
 
 function render(){
-  riff=generate(state);
+  riff=state.edit?fromEdit(state):generate(state);
+  $('editedTag').hidden=!state.edit; $('revert').hidden=!state.edit;
   const st=state;
   $('riffTitle').textContent = NAMES[st.root]+' '+st.scale.replace(/ \(.*\)/,'');
   const tn = riff.tun ? riff.tun.name+' · ' : TONES.synth[st.tone.synth]+' · ';
   $('riffMeta').textContent = tn+'complexity '+Math.round(st.cx*100)+' · '+st.bars+(st.bars>1?' bars':' bar')+' · '+st.bpm+' BPM · '+riff.events.length+' notes';
   $('seedChip').textContent = 'R'+st.rSeed+' · N'+st.pSeed;
-  drawRoll(); renderTab();
+  drawRoll(); renderTab(); updateTools();
 }
 
+const SW=26, RH=17;
+let editing=false, sel=null; // sel = {abs, p}
+function viewRange(){
+  if(!editing) return [riff.lo-2, riff.hi+2];
+  const r=ranges(state); return [Math.min(r.vMin,riff.lo), Math.max(r.vMax,riff.hi)];
+}
 function drawRoll(){
-  const cv=$('roll'), dpr=window.devicePixelRatio||1, w=cv.clientWidth||600, h=cv.clientHeight||150;
+  const cv=$('roll'), dpr=window.devicePixelRatio||1;
+  const [lo,hi]=viewRange(), rows=hi-lo+1;
+  let w,h;
+  if(editing){ w=riff.steps*SW; h=rows*RH; cv.style.width=w+'px'; cv.style.height=h+'px'; }
+  else { cv.style.width=''; cv.style.height=''; w=cv.clientWidth||600; h=cv.clientHeight||150; }
   cv.width=Math.round(w*dpr); cv.height=Math.round(h*dpr);
   const g=cv.getContext('2d'); g.setTransform(dpr,0,0,dpr,0,0); g.clearRect(0,0,w,h);
-  const lo=riff.lo-2, hi=riff.hi+2, rows=hi-lo+1, rh=(h-8)/rows, sw=w/riff.steps;
-  const line=tok('--line'), muted=tok('--muted'), acc=tok('--accent'), heat=tok('--heat'), surf=tok('--surface');
-  // root rows
-  for(let p=lo;p<=hi;p++){ if(((p-state.root)%12+12)%12===0){ g.fillStyle=line; g.globalAlpha=0.45; g.fillRect(0,h-4-(p-lo+1)*rh,w,rh); g.globalAlpha=1; } }
-  for(let s=0;s<=riff.steps;s+=4){ g.fillStyle=s%16===0?muted:line; g.globalAlpha=s%16===0?0.55:1; g.fillRect(Math.round(s*sw),0,1,h); g.globalAlpha=1; }
+  const rh=editing?RH:(h-8)/rows, sw=w/riff.steps;
+  const yOf=p=>editing?(hi-p)*RH:h-4-(p-lo+1)*rh;
+  const line=tok('--line'), muted=tok('--muted'), acc=tok('--accent'), heat=tok('--heat'), surf=tok('--surface'), chip=tok('--chip'), ink=tok('--ink');
+  const sc=SCALES[state.scale], rel=p=>((p-state.root)%12+12)%12;
+  for(let p=lo;p<=hi;p++){
+    if(editing && sc.includes(rel(p))){ g.fillStyle=chip; g.fillRect(0,yOf(p),w,rh); }
+    if(rel(p)===0){ g.fillStyle=line; g.globalAlpha=editing?0.9:0.45; g.fillRect(0,yOf(p),w,rh); g.globalAlpha=1; }
+    if(editing){ g.fillStyle=line; g.globalAlpha=0.5; g.fillRect(0,yOf(p)+rh-1,w,1); g.globalAlpha=1; }
+  }
+  for(let s=0;s<=riff.steps;s+=(editing?1:4)){
+    const strong=s%16===0, beat=s%4===0;
+    g.fillStyle=strong?muted:line; g.globalAlpha=strong?0.6:beat?1:0.45; g.fillRect(Math.round(s*sw),0,strong?2:1,h); g.globalAlpha=1;
+  }
   riff.events.forEach(e=>{
-    e.pitches.forEach(p=>{
-      const t=Math.min(1, ((p===e.pitches[0]?1-CONS[((p-state.root)%12+12)%12]:e.t)));
+    e.pitches.forEach((p,k)=>{
+      const t=Math.min(1,k===0?1-CONS[rel(p)]:e.t);
       g.fillStyle=mix(acc,heat,t);
-      const x=e.abs*sw+1, y=h-4-(p-lo+1)*rh, ww=Math.max(3,e.dur*sw-2), hh=Math.max(3,rh-1);
-      g.beginPath(); if(g.roundRect) g.roundRect(x,y,ww,hh,2); else g.rect(x,y,ww,hh); g.fill();
+      const x=e.abs*sw+1, y=yOf(p)+(editing?1:0), ww=Math.max(3,e.dur*sw-2), hh=Math.max(3,rh-(editing?2:1));
+      g.beginPath(); if(g.roundRect) g.roundRect(x,y,ww,hh,editing?4:2); else g.rect(x,y,ww,hh); g.fill();
       if(e.ped){ g.fillStyle=surf; g.globalAlpha=0.35; g.fillRect(x,y+hh*0.55,ww,hh*0.45); g.globalAlpha=1; }
+      if(sel&&sel.abs===e.abs&&sel.p===p){ g.strokeStyle=ink; g.lineWidth=2.5; g.beginPath(); if(g.roundRect) g.roundRect(x-1,y-1,ww+2,hh+2,5); else g.rect(x-1,y-1,ww+2,hh+2); g.stroke(); }
     });
   });
+  const lb=$('rlabels'); lb.hidden=!editing;
+  if(editing){
+    lb.innerHTML='';
+    for(let p=hi;p>=lo;p--){ const d=document.createElement('div'); d.style.height=RH+'px'; d.textContent=noteName(p); if(rel(p)===0) d.className='root'; else if(sc.includes(rel(p))) d.className='sc'; lb.appendChild(d); }
+  }
+  rollGeom={lo,hi,sw,rh,h,editing};
 }
+let rollGeom=null;
 
 function renderTab(){
   const box=$('tab'); box.innerHTML=''; cols=[]; chips=[]; cover=new Array(riff.steps).fill(-1);
@@ -532,6 +633,8 @@ function renderTab(){
       riff.events.filter(e=>e.bar===b).forEach(e=>{
         const c=document.createElement('span'); c.className='nchip';
         c.textContent=e.pitches.map(noteName).join('+'); c.style.color=mix(acc,heat,e.t);
+        if(sel&&sel.abs===e.abs) c.classList.add('sel');
+        c.onclick=()=>{ if(!editing) setEditing(true); sel={abs:e.abs,p:e.pitches[0]}; audition(e.pitches); refreshSel(); };
         row.appendChild(c); chips[riff.events.indexOf(e)]=c;
       });
       wrap.appendChild(row);
@@ -539,6 +642,7 @@ function renderTab(){
     box.appendChild(wrap); return;
   }
   $('tabLbl').textContent='Tab · '+riff.tun.name;
+  box.classList.toggle('editing-tab',editing);
   const T=riff.tun, nS=T.notes.length, order=[...Array(nS).keys()].reverse();
   for(let b=0;b<state.bars;b++){
     const bar=document.createElement('div'); bar.className='bar';
@@ -549,11 +653,12 @@ function renderTab(){
     const bl0=document.createElement('div'); bl0.className='bl'; bl0.style.height=(nS*21)+'px'; bar.appendChild(bl0);
     for(let s=0;s<16;s++){
       const abs=b*16+s, e=byAbs[abs];
-      const col=document.createElement('div'); col.className='col';
+      const col=document.createElement('div'); col.className='col'+(sel&&sel.abs===abs?' sel':'');
       const pm=document.createElement('div'); pm.className='cell pm'; pm.textContent=e&&e.pm?'PM':''; col.appendChild(pm);
       order.forEach(si=>{
         const c=document.createElement('div'); c.className='cell str';
-        if(e&&e.pos){ const hit=e.pos.find(x=>x[0]===si); if(hit){ const f=document.createElement('span'); f.className='f'; f.textContent=hit[1]; f.style.color=mix(acc,heat,e.t); c.appendChild(f); } }
+        if(e&&e.pos){ const k=e.pos.findIndex(x=>x[0]===si); if(k>=0){ const hit=e.pos[k]; const f=document.createElement('span'); f.className='f'+(sel&&sel.abs===abs&&sel.p===e.pitches[k]?' fsel':''); f.textContent=hit[1]; f.style.color=mix(acc,heat,e.t); c.appendChild(f); } }
+        c.onclick=()=>tabTap(abs,si);
         col.appendChild(c);
       });
       const cn=document.createElement('div'); cn.className='cell cnt'; cn.textContent= s%4===0 ? (s/4+1) : ['','e','&','a'][s%4]; col.appendChild(cn);
@@ -745,6 +850,150 @@ function tick(){
   }
   requestAnimationFrame(tick);
 }
+/* ---------- note editor ---------- */
+function audition(pitches){
+  try{
+    ensureCtx(); const g=ctx.createGain(); g.gain.value=0.8; g.connect(master);
+    const d=makeChain(g), t=ctx.currentTime+0.02, ins=state.instrument;
+    pitches.forEach(p=>{ if(ins==='synth') synthVoice(d,p,t,0.25,0.9); else pluckVoice(ins==='bass'?'bass':'gtr',d,p,t,0.35,0.9,false); });
+    setTimeout(()=>{ try{g.disconnect();}catch(e){} },1500);
+  }catch(e){}
+}
+function ensureEdit(){
+  if(!state.edit) state.edit={events:riff.events.map(e=>({abs:e.abs,dur:e.dur,pitches:[...e.pitches],pm:!!e.pm}))};
+  return state.edit.events;
+}
+function normalize(){
+  const steps=state.bars*16;
+  let ev=state.edit.events.filter(e=>e.abs>=0&&e.abs<steps&&e.pitches.length);
+  ev.sort((a,b)=>a.abs-b.abs);
+  const out=[];
+  ev.forEach(e=>{ const prev=out[out.length-1]; if(prev&&prev.abs===e.abs){ e.pitches.forEach(p=>{ if(!prev.pitches.includes(p)&&prev.pitches.length<3) prev.pitches.push(p); }); } else out.push(e); });
+  out.forEach((e,i)=>{ const next=i+1<out.length?out[i+1].abs:steps; e.dur=Math.max(1,Math.min(e.dur,next-e.abs)); });
+  state.edit.events=out;
+}
+function evAt(abs){ return state.edit?state.edit.events.find(e=>e.abs===abs):null; }
+function edit(fn){
+  snapshot();
+  const evs=ensureEdit();
+  const r=fn(evs);
+  if(r===false){ undoStack.pop(); updateUndo(); return; }
+  normalize(); render(); persist(); updateUndo();
+}
+function shownPitch(p){ const tun=riff.tun; if(!tun) return p; const low=Math.min(...tun.notes); while(p<low) p+=12; return p; }
+function addNote(abs,p){
+  edit(evs=>{
+    const at=evs.find(e=>e.abs===abs);
+    if(at){ if(at.pitches.includes(p)) return false; if(at.pitches.length>=3){ toast('Three notes at once is the limit'); return false; } at.pitches.push(p); at.pitches.sort((a,b)=>a-b); }
+    else {
+      const cov=evs.find(e=>e.abs<abs&&e.abs+e.dur>abs);
+      const nxt=evs.filter(e=>e.abs>abs).reduce((m,e)=>Math.min(m,e.abs),state.bars*16);
+      let dur=Math.min(2,nxt-abs);
+      if(cov){ dur=Math.min(Math.max(dur,cov.abs+cov.dur-abs),4,nxt-abs); cov.dur=abs-cov.abs; }
+      evs.push({abs,dur:Math.max(1,dur),pitches:[p],pm:false});
+    }
+    sel={abs,p};
+  });
+  const e=riff.events.find(x=>x.abs===abs); audition(e?e.pitches:[p]);
+}
+function rollTap(ev){
+  if(!editing){ setEditing(true); return; }
+  const cv=$('roll'), r=cv.getBoundingClientRect(), x=ev.clientX-r.left, y=ev.clientY-r.top, G=rollGeom;
+  const step=Math.floor(x/G.sw), p=G.hi-Math.floor(y/G.rh);
+  if(step<0||step>=riff.steps||p<G.lo||p>G.hi) return;
+  const hit=riff.events.find(e=>e.abs<=step&&step<e.abs+e.dur&&e.pitches.includes(p));
+  if(hit){ sel={abs:hit.abs,p}; audition(hit.pitches); refreshSel(); return; }
+  addNote(step,p);
+}
+function tabTap(abs,si){
+  if(!editing){ setEditing(true); }
+  const e=riff.events.find(x=>x.abs===abs);
+  if(e&&e.pos){ const k=e.pos.findIndex(x=>x[0]===si); if(k>=0){ sel={abs,p:e.pitches[k]}; audition(e.pitches); refreshSel(); return; } }
+  // add a note on this string near where the hand already is
+  const T=riff.tun.notes, prev=[...riff.events].reverse().find(x=>x.abs<=abs&&x.pos)||riff.events.find(x=>x.pos);
+  let fret=0;
+  if(prev){ const fr=prev.pos.map(q=>q[1]).filter(f=>f>0); fret=fr.length?Math.round(fr.reduce((a,b)=>a+b,0)/fr.length):0; }
+  addNote(abs,T[si]+fret);
+}
+function refreshSel(){ drawRoll(); renderTab(); updateTools(); }
+function selEvent(){ return sel?riff.events.find(e=>e.abs===sel.abs&&e.pitches.includes(sel.p)):null; }
+function updateTools(){
+  const e=selEvent(); if(sel&&!e) sel=null;
+  const on=!!e;
+  document.querySelectorAll('#tools button').forEach(b=>{ b.disabled=!on; });
+  const pmB=document.querySelector('[data-act="pm"]');
+  if(state.instrument!=='guitar') pmB.disabled=true;
+  pmB.setAttribute('aria-pressed',!!(e&&e.pm));
+  document.querySelector('[data-act="fifth"]').setAttribute('aria-pressed',!!(e&&e.pitches.length>1));
+  $('editHint').innerHTML = on
+    ? 'Selected <b>'+e.pitches.map(noteName).join('+')+'</b> · bar '+(e.bar+1)+', beat '+(Math.floor(e.s/4)+1)+(e.s%4?' '+['','e','&','a'][e.s%4]:'')+' · '+e.dur+'/16'
+    : 'Tap an empty spot to add a note. Tap a note to select it.';
+}
+function act(a){
+  const e0=selEvent(); if(!e0) return;
+  const steps=state.bars*16;
+  let snd=null;
+  edit(evs=>{
+    const e=evs.find(x=>x.abs===sel.abs); if(!e) return false;
+    const i=e.pitches.indexOf(sel.p)>=0?e.pitches.indexOf(sel.p):e.pitches.findIndex(q=>shownPitch(q)===sel.p);
+    if(i<0) return false;
+    const nextAbs=evs.filter(x=>x.abs>e.abs).reduce((m,x)=>Math.min(m,x.abs),steps);
+    if(a==='up'||a==='down'){
+      const np=e.pitches[i]+(a==='up'?1:-1); const r=ranges(state);
+      if(np<r.vMin-12||np>r.vMax+12||e.pitches.includes(np)) return false;
+      e.pitches[i]=np; sel.p=shownPitch(np); snd=e.pitches;
+    } else if(a==='left'||a==='right'){
+      const na=e.abs+(a==='left'?-1:1);
+      if(na<0||na>=steps){ return false; }
+      if(evs.some(x=>x!==e&&x.abs===na)){ toast('Another note starts there'); return false; }
+      if(a==='left'){ const prev=evs.find(x=>x.abs<na&&x.abs+x.dur>na); if(prev) prev.dur=na-prev.abs; }
+      e.abs=na; sel.abs=na;
+    } else if(a==='shorter'){ if(e.dur<=1) return false; e.dur--; }
+    else if(a==='longer'){ if(e.abs+e.dur>=nextAbs){ toast(nextAbs<steps?'The next note is in the way':'That\u2019s the end of the riff'); return false; } e.dur++; }
+    else if(a==='fifth'){ if(e.pitches.length>1) e.pitches=[e.pitches[i]]; else e.pitches.push(e.pitches[0]+7); snd=e.pitches; }
+    else if(a==='pm'){ e.pm=!e.pm; }
+    else if(a==='del'){ e.pitches.splice(i,1); if(!e.pitches.length) evs.splice(evs.indexOf(e),1); sel=null; }
+  });
+  if(snd) audition(riff.events.find(x=>sel&&x.abs===sel.abs)?.pitches||snd);
+}
+document.querySelectorAll('#tools button').forEach(b=>b.onclick=()=>act(b.dataset.act));
+$('roll').addEventListener('click',rollTap);
+function setEditing(on){
+  editing=on; if(!on) sel=null;
+  $('editBtn').setAttribute('aria-pressed',on); $('editBtn').textContent=on?'Done editing':'Edit notes';
+  $('rollWrap').classList.toggle('editing',on); $('editbar').hidden=!on;
+  drawRoll(); renderTab(); updateTools();
+  if(on){ const W=$('rollWrap'), G=rollGeom; const mid=(riff.lo+riff.hi)/2; W.scrollTop=Math.max(0,(G.hi-mid)*RH-W.clientHeight/2); W.scrollLeft=0; }
+}
+$('editBtn').onclick=()=>setEditing(!editing);
+$('revert').onclick=()=>{ snapshot(); state.edit=null; sel=null; changed(); toast('Back to the generated riff', 'Undo', undo); };
+
+/* ---------- undo / redo ---------- */
+let undoStack=[], redoStack=[], lastSnap={k:null,t:0};
+function snapshot(key){
+  const now=Date.now();
+  if(key&&lastSnap.k===key&&now-lastSnap.t<1200){ lastSnap.t=now; return; }
+  lastSnap={k:key||null,t:now};
+  undoStack.push(JSON.stringify(state)); if(undoStack.length>80) undoStack.shift(); redoStack=[]; updateUndo();
+}
+function updateUndo(){ $('undo').disabled=!undoStack.length; $('redo').disabled=!redoStack.length; }
+function undo(){ if(!undoStack.length) return; redoStack.push(JSON.stringify(state)); state=sanitize(JSON.parse(undoStack.pop())); lastSnap={k:null,t:0}; changed(); updateUndo(); }
+function redo(){ if(!redoStack.length) return; undoStack.push(JSON.stringify(state)); state=sanitize(JSON.parse(redoStack.pop())); lastSnap={k:null,t:0}; changed(); updateUndo(); }
+$('undo').onclick=undo; $('redo').onclick=redo;
+/* changes that make a new riff drop the edits, with a way back */
+function regen(key,fn){
+  snapshot(key); const had=!!state.edit; fn(); state.edit=null; sel=null; changed();
+  if(had) toast('New riff made, your edits were set aside','Undo',undo);
+}
+function keep(key,fn){ snapshot(key); fn(); changed(); }
+document.addEventListener('keydown',ev=>{
+  const tag=(ev.target.tagName||'').toLowerCase(); if(tag==='input'||tag==='select'||tag==='textarea') return;
+  if((ev.ctrlKey||ev.metaKey)&&ev.key.toLowerCase()==='z'){ ev.preventDefault(); ev.shiftKey?redo():undo(); return; }
+  if(!editing||!sel) return;
+  const m={ArrowUp:'up',ArrowDown:'down',ArrowLeft:'left',ArrowRight:'right',Delete:'del',Backspace:'del','+':'longer','=':'longer','-':'shorter'}[ev.key];
+  if(m){ ev.preventDefault(); act(m); }
+});
+
 let rt=null;
 function restartIfPlaying(){ if(!playing) return; clearTimeout(rt); rt=setTimeout(()=>{ if(playing) start(); },160); }
 
@@ -761,9 +1010,9 @@ function syncUI(){
   if(showC){
     const ins=st.instrument, arr=st.custom[ins], box=$('cstr'); box.innerHTML='';
     arr.forEach((n,i)=>{
-      const sel=document.createElement('select'); sel.id='cs'+i; sel.setAttribute('aria-label','String '+(arr.length-i));
+      const sel=document.createElement('select'); sel.id='cs'+i; /* string picker */ sel.setAttribute('aria-label','String '+(arr.length-i));
       for(let m=RANGE[ins][0];m<=RANGE[ins][1];m++){ const o=document.createElement('option'); o.value=m; o.textContent=noteName(m); if(m===n) o.selected=true; sel.appendChild(o); }
-      sel.onchange=()=>{ st.custom[ins][i]=+sel.value; changed(); };
+      sel.onchange=()=>keep(null,()=>{ state.custom[ins][i]=+sel.value; });
       box.appendChild(sel);
     });
   }
@@ -780,33 +1029,38 @@ function syncUI(){
 function changed(restart=true){ syncUI(); render(); persist(); if(restart) restartIfPlaying(); }
 
 (function buildControls(){
-  const k=$('keys'); NAMES.forEach((n,i)=>{ const b=document.createElement('button'); b.textContent=n; b.setAttribute('aria-label','Key of '+n); b.onclick=()=>{ state.root=i; changed(); }; k.appendChild(b); });
+  const k=$('keys'); NAMES.forEach((n,i)=>{ const b=document.createElement('button'); b.textContent=n; b.setAttribute('aria-label','Key of '+n); b.onclick=()=>{ if(state.root===i) return; keep(null,()=>{ const old=state.root; state.root=i; if(state.edit){ let dlt=((i-old)%12+12)%12; if(dlt>6) dlt-=12; state.edit.events.forEach(e=>e.pitches=e.pitches.map(p=>p+dlt)); if(sel) sel.p+=dlt; } }); }; k.appendChild(b); });
   fillSelect($('scale'),Object.fromEntries(Object.keys(SCALES).map(s=>[s,s])),state.scale);
 })();
-document.querySelectorAll('#insSeg button').forEach(b=>b.onclick=()=>{ state.instrument=b.dataset.v; changed(); });
-document.querySelectorAll('#barSeg button').forEach(b=>b.onclick=()=>{ state.bars=+b.dataset.v; changed(); });
-$('tuning').onchange=e=>{ state.tuning[state.instrument]=e.target.value; changed(); };
-$('tone').onchange=e=>{ state.tone[state.instrument]=e.target.value; changed(); };
-$('scale').onchange=e=>{ state.scale=e.target.value; changed(); };
-$('bpm').oninput=e=>{ state.bpm=+e.target.value; changed(); };
-$('diss').oninput=e=>{ state.diss=e.target.value/100; changed(); };
-$('busy').oninput=e=>{ state.busy=e.target.value/100; changed(); };
-$('cx').oninput=e=>{ state.cx=e.target.value/100; changed(); };
-$('strPlus').onclick=()=>{ const ins=state.instrument, a=state.custom[ins]; if(a.length<7){ a.push(Math.min(RANGE[ins][1],a[a.length-1]+5)); changed(); } };
-$('strMinus').onclick=()=>{ const a=state.custom[state.instrument]; if(a.length>4){ a.pop(); changed(); } };
-$('drums').onchange=e=>{ state.drums=e.target.checked; changed(); };
-$('swing').onchange=e=>{ state.swing=e.target.checked; changed(); };
-$('loop').onchange=e=>{ state.loop=e.target.checked; changed(); };
+document.querySelectorAll('#insSeg button').forEach(b=>b.onclick=()=>{ if(state.instrument===b.dataset.v) return; regen(null,()=>{ state.instrument=b.dataset.v; }); });
+document.querySelectorAll('#barSeg button').forEach(b=>b.onclick=()=>{ if(state.bars===+b.dataset.v) return; regen(null,()=>{ state.bars=+b.dataset.v; }); });
+$('tuning').onchange=e=>keep(null,()=>{ state.tuning[state.instrument]=e.target.value; });
+$('tone').onchange=e=>keep(null,()=>{ state.tone[state.instrument]=e.target.value; });
+$('scale').onchange=e=>regen(null,()=>{ state.scale=e.target.value; });
+$('bpm').oninput=e=>keep('bpm',()=>{ state.bpm=+e.target.value; });
+$('diss').oninput=e=>regen('diss',()=>{ state.diss=e.target.value/100; });
+$('busy').oninput=e=>regen('busy',()=>{ state.busy=e.target.value/100; });
+$('cx').oninput=e=>regen('cx',()=>{ state.cx=e.target.value/100; });
+$('strPlus').onclick=()=>{ const ins=state.instrument, a=state.custom[ins]; if(a.length<7){ keep(null,()=>a.push(Math.min(RANGE[ins][1],a[a.length-1]+5))); } };
+$('strMinus').onclick=()=>{ const a=state.custom[state.instrument]; if(a.length>4){ keep(null,()=>a.pop()); } };
+$('drums').onchange=e=>keep(null,()=>{ state.drums=e.target.checked; });
+$('swing').onchange=e=>keep(null,()=>{ state.swing=e.target.checked; });
+$('loop').onchange=e=>keep(null,()=>{ state.loop=e.target.checked; });
 let taps=[];
 $('tap').onclick=()=>{ const n=performance.now(); if(taps.length&&n-taps[taps.length-1]>2000) taps=[]; taps.push(n); if(taps.length>5) taps.shift();
-  if(taps.length>=2){ const iv=(taps[taps.length-1]-taps[0])/(taps.length-1); state.bpm=Math.max(60,Math.min(220,Math.round(60000/iv))); changed(); } };
-const newRiff=()=>{ state.rSeed=newSeed(); state.pSeed=newSeed(); changed(); };
+  if(taps.length>=2){ const iv=(taps[taps.length-1]-taps[0])/(taps.length-1); keep('bpm',()=>{ state.bpm=Math.max(60,Math.min(220,Math.round(60000/iv))); }); } };
+const newRiff=()=>regen(null,()=>{ state.rSeed=newSeed(); state.pSeed=newSeed(); });
 $('newRiff').onclick=newRiff; $('newRiff2').onclick=newRiff;
-$('newNotes').onclick=()=>{ state.pSeed=newSeed(); changed(); };
-$('newRhythm').onclick=()=>{ state.rSeed=newSeed(); changed(); };
+$('newNotes').onclick=()=>regen(null,()=>{ state.pSeed=newSeed(); });
+$('newRhythm').onclick=()=>regen(null,()=>{ state.rSeed=newSeed(); });
 $('play').onclick=()=>{ playing?stop():start(); };
 
-function toast(msg){ const t=$('toast'); t.textContent=msg; t.classList.add('show'); clearTimeout(toast.h); toast.h=setTimeout(()=>t.classList.remove('show'),1800); }
+function toast(msg,label,fn){
+  const t=$('toast'); t.textContent='';
+  const sp=document.createElement('span'); sp.textContent=msg; t.appendChild(sp);
+  if(label){ const b=document.createElement('button'); b.textContent=label; b.onclick=()=>{ t.classList.remove('show'); fn(); }; t.appendChild(b); }
+  t.classList.add('show'); clearTimeout(toast.h); toast.h=setTimeout(()=>t.classList.remove('show'),label?4500:1800);
+}
 function copy(text,okMsg){
   const fb=()=>{ const ta=$('fallback'); ta.hidden=false; ta.value=text; ta.focus(); ta.select(); toast('Select all and copy from the box'); };
   try{ navigator.clipboard.writeText(text).then(()=>toast(okMsg),fb); }catch(e){ fb(); }
@@ -817,7 +1071,7 @@ $('copyTab').onclick=()=>copy(tabText(),riff.tun?'Tab copied':'Notes copied');
 const encode=o=>'RS1.'+btoa(unescape(encodeURIComponent(JSON.stringify(o)))).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'');
 function decode(s){ s=s.trim(); if(!s.startsWith('RS1.')) throw 0; let b=s.slice(4).replace(/-/g,'+').replace(/_/g,'/'); while(b.length%4) b+='='; return JSON.parse(decodeURIComponent(escape(atob(b)))); }
 $('copyCode').onclick=()=>copy(encode(state),'Riff code copied');
-$('loadCode').onclick=()=>{ try{ state=sanitize(decode($('codeIn').value)); $('codeIn').value=''; changed(); toast('Riff loaded'); }catch(e){ toast('That code doesn’t look right. Codes start with RS1.'); } };
+$('loadCode').onclick=()=>{ try{ const nx=decode($('codeIn').value); snapshot(); state=sanitize(nx); sel=null; $('codeIn').value=''; changed(); toast('Riff loaded','Undo',undo); return; state=sanitize(decode($('codeIn').value)); $('codeIn').value=''; changed(); toast('Riff loaded'); }catch(e){ toast('That code doesn’t look right. Codes start with RS1.'); } };
 let saved=[]; try{ saved=JSON.parse(localStorage.getItem('riffgen.saved.v1')||'[]'); if(!Array.isArray(saved)) saved=[]; }catch(e){ saved=[]; }
 const persistSaved=()=>{ try{ localStorage.setItem('riffgen.saved.v1',JSON.stringify(saved)); }catch(e){} };
 function renderSaved(){
@@ -825,7 +1079,7 @@ function renderSaved(){
   saved.forEach((r,i)=>{
     const li=document.createElement('li'), sp=document.createElement('span'), lb=document.createElement('button'), x=document.createElement('button');
     sp.textContent=r.name; lb.className='btn'; lb.textContent='Load'; x.className='x'; x.textContent='×'; x.setAttribute('aria-label','Delete '+r.name);
-    lb.onclick=()=>{ state=sanitize(r.state); changed(); toast('Loaded'); window.scrollTo({top:0,behavior:'smooth'}); };
+    lb.onclick=()=>{ snapshot(); state=sanitize(r.state); sel=null; changed(); toast('Loaded','Undo',undo); window.scrollTo({top:0,behavior:'smooth'}); };
     x.onclick=()=>{ saved.splice(i,1); persistSaved(); renderSaved(); toast('Deleted'); };
     li.append(sp,lb,x); ul.appendChild(li);
   });

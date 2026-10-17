@@ -2,7 +2,7 @@
 
 Generates new, original riffs for guitar, bass or synth — right in the browser. Free, no account, no server.
 
-**Version:** 1.0.0 (shown on the front page)
+**Version:** 1.1.0 (shown on the front page)
 
 ## Features
 - Guitar, bass or synth, each with its own tones (clean/crunch/high gain, fingers/pick/fuzz, saw/pluck/acid)
@@ -13,6 +13,8 @@ Generates new, original riffs for guitar, bass or synth — right in the browser
 - **Complexity** slider: from repeating, simple riffs to odd accents, wide leaps and more varied bars
 - Busyness, swing, drums and loop
 - Audio playback (Web Audio, plucked-string synthesis), piano roll, and guitar/bass tab with palm-mute marks
+- **Note editor:** tap the piano roll or the tab to add notes, tap a note to select it, then move it, change pitch or length, add a fifth, palm-mute or delete it
+- Undo / redo for every change; changing the key transposes your edits
 - New riff / new notes / new rhythm, save riffs, share riff codes, copy tab as text
 
 ## Run
