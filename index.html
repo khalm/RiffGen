@@ -87,6 +87,9 @@ input[type=range]::-moz-range-thumb{width:20px;height:20px;border-radius:50%;bac
 .btn:active{transform:translateY(1px)}
 .btn.primary{background:var(--accent);border-color:var(--accent);color:var(--on-accent)}
 
+.tuneread{margin:0;display:flex;flex-wrap:wrap;gap:4px 10px;align-items:baseline;padding:10px 12px;border-radius:10px;background:var(--chip)}
+.tuneread b{font-family:var(--f-mono);font-weight:700;font-size:22px;line-height:1.1;letter-spacing:.06em;word-break:break-all}
+.tuneread span{font-family:var(--f-mono);font-size:13px;color:var(--muted)}
 .custom{display:flex;flex-direction:column;gap:8px}
 .cstr{display:grid;grid-template-columns:repeat(auto-fill,minmax(64px,1fr));gap:6px}
 .cstr select{padding:8px 6px;font-family:var(--f-mono);font-size:14px}
@@ -189,7 +192,7 @@ textarea#fallback{width:100%;height:140px;font-family:var(--f-mono);font-size:12
 </head>
 <body>
 <header class="top">
-  <div class="brand"><h1>Riff<span>Gen</span></h1><span class="ver" id="ver">v1.1.0</span></div>
+  <div class="brand"><h1>Riff<span>Gen</span></h1><span class="ver" id="ver">v1.2.0</span></div>
   <p>Original riffs for guitar, bass and synth. Pick a key, set how much it bites, and press play.</p>
 </header>
 
@@ -204,8 +207,10 @@ textarea#fallback{width:100%;height:140px;font-family:var(--f-mono);font-size:12
       </div>
       <div class="row2">
         <label class="field" id="tuningField">Tuning<select id="tuning"></select></label>
-        <label class="field">Tone<select id="tone"></select></label>
+        <label class="field" id="transField">Transpose<select id="transpose"></select></label>
       </div>
+      <p class="tuneread" id="tuneRead"></p>
+      <label class="field">Tone<select id="tone"></select></label>
       <div class="custom" id="customRow" hidden>
         <div class="lbl">Strings, low to high <span><button class="mini" id="strMinus" aria-label="Remove a string">−</button><button class="mini" id="strPlus" aria-label="Add a string">+</button></span></div>
         <div class="cstr" id="cstr"></div>
@@ -296,7 +301,7 @@ textarea#fallback{width:100%;height:140px;font-family:var(--f-mono);font-size:12
     </div>
   </section>
 </main>
-<p class="foot">RiffGen <span id="ver2">v1.1.0</span> · Everything is generated and played in your browser. Free, no account.</p>
+<p class="foot">RiffGen <span id="ver2">v1.2.0</span> · Everything is generated and played in your browser. Free, no account.</p>
 
 <div class="transport"><div class="tin">
   <button class="play" id="play" aria-pressed="false"><svg viewBox="0 0 20 20" id="playIcon"><path d="M5 3l12 7-12 7z"/></svg><span id="playTxt">Play</span></button>
@@ -307,7 +312,7 @@ textarea#fallback{width:100%;height:140px;font-family:var(--f-mono);font-size:12
 <div class="toast" id="toast" role="status"></div>
 
 <script>
-const VERSION = '1.1.0';
+const VERSION = '1.2.0';
 document.getElementById('ver').textContent = 'v' + VERSION;
 document.getElementById('ver2').textContent = 'v' + VERSION;
 
@@ -324,29 +329,27 @@ const CONS = [1.0,0.0,0.4,0.7,0.72,0.85,0.12,0.95,0.55,0.65,0.4,0.1];
 const INTS = [12,7,5,4,3,9,8,2,10,6,11,1,13];
 const TUNINGS = {
   guitar:{
-    std:{name:'Standard (E)',notes:[40,45,50,55,59,64],labels:['E','A','D','G','B','e']},
-    ebstd:{name:'Eb standard',notes:[39,44,49,54,58,63],labels:['Eb','Ab','Db','Gb','Bb','eb']},
-    dropd:{name:'Drop D',notes:[38,45,50,55,59,64],labels:['D','A','D','G','B','e']},
-    dstd:{name:'D standard',notes:[38,43,48,53,57,62],labels:['D','G','C','F','A','d']},
-    dropc:{name:'Drop C',notes:[36,43,48,53,57,62],labels:['C','G','C','F','A','d']},
-    dropb:{name:'Drop B',notes:[35,42,47,52,56,61],labels:['B','F#','B','E','G#','c#']},
-    dadgad:{name:'DADGAD',notes:[38,45,50,55,57,62],labels:['D','A','D','G','A','d']},
-    openg:{name:'Open G',notes:[38,43,50,55,59,62],labels:['D','G','D','G','B','d']},
-    opend:{name:'Open D',notes:[38,45,50,54,57,62],labels:['D','A','D','F#','A','d']},
-    seven:{name:'7-string (B)',notes:[35,40,45,50,55,59,64],labels:['B','E','A','D','G','B','e']},
+    std:{name:'Standard',kind:'std',notes:[40,45,50,55,59,64]},
+    dropd:{name:'Drop D',kind:'drop',notes:[38,45,50,55,59,64]},
+    dadgad:{name:'DADGAD',kind:'alt',notes:[38,45,50,55,57,62]},
+    openg:{name:'Open G',kind:'open',root:7,notes:[38,43,50,55,59,62]},
+    opend:{name:'Open D',kind:'open',root:2,notes:[38,45,50,54,57,62]},
+    opene:{name:'Open E',kind:'open',root:4,notes:[40,47,52,56,59,64]},
+    seven:{name:'7-string standard',kind:'std',sfx:' (7-string)',notes:[35,40,45,50,55,59,64]},
+    sevendrop:{name:'7-string drop A',kind:'drop',sfx:' (7-string)',notes:[33,40,45,50,55,59,64]},
     custom:{name:'Custom…'}
   },
   bass:{
-    std4:{name:'4-string (E)',notes:[28,33,38,43],labels:['E','A','D','G']},
-    ebstd:{name:'Eb standard',notes:[27,32,37,42],labels:['Eb','Ab','Db','Gb']},
-    dropd:{name:'Drop D',notes:[26,33,38,43],labels:['D','A','D','G']},
-    dstd:{name:'D standard',notes:[26,31,36,41],labels:['D','G','C','F']},
-    dropc:{name:'Drop C',notes:[24,31,36,41],labels:['C','G','C','F']},
-    five:{name:'5-string (B)',notes:[23,28,33,38,43],labels:['B','E','A','D','G']},
-    six:{name:'6-string (B)',notes:[23,28,33,38,43,48],labels:['B','E','A','D','G','C']},
+    std4:{name:'4-string standard',kind:'std',sfx:' (4-string)',notes:[28,33,38,43]},
+    dropd:{name:'4-string drop D',kind:'drop',sfx:' (4-string)',notes:[26,33,38,43]},
+    five:{name:'5-string standard',kind:'std',sfx:' (5-string)',notes:[23,28,33,38,43]},
+    six:{name:'6-string standard',kind:'std',sfx:' (6-string)',notes:[23,28,33,38,43,48]},
     custom:{name:'Custom…'}
   }
 };
+// older saved riffs used fixed tunings; map them to shape + transpose
+const LEGACY = {guitar:{ebstd:['std',-1],dstd:['std',-2],dropc:['dropd',-2],dropb:['dropd',-3]},bass:{ebstd:['std4',-1],dstd:['std4',-2],dropc:['dropd',-2]}};
+const TRANSPOSE = [[2,'Up 1 step (2 semitones)'],[1,'Up ½ step (1 semitone)'],[0,'None, standard pitch'],[-1,'Down ½ step (1 semitone)'],[-2,'Down 1 step (2 semitones)'],[-3,'Down 1½ steps (3 semitones)'],[-4,'Down 2 steps (4 semitones)'],[-5,'Down 2½ steps (5 semitones)'],[-6,'Down 3 steps (6 semitones)'],[-7,'Down 3½ steps (7 semitones)']];
 const TONES = {guitar:{clean:'Clean',crunch:'Crunch',heavy:'High gain'},bass:{finger:'Fingers',pick:'Pick',fuzz:'Fuzz'},synth:{saw:'Saw stack',pluck:'Square pluck',acid:'Acid'}};
 function planFor(bars,cx){
   if(bars===1) return ['A'];
@@ -356,12 +359,25 @@ function planFor(bars,cx){
 }
 const CUSTOM_DEF={guitar:[40,45,50,55,59,64],bass:[28,33,38,43]};
 const RANGE={guitar:[28,69],bass:[16,50]};
+const SHARPS=['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'], FLATS=['C','Db','D','Eb','E','F','Gb','G','Ab','A','Bb','B'];
+// spell every string the same way (all sharps or all flats), the way players write tunings
+function spellMode(notes,t){ const low=NAMES[((notes[0]%12)+12)%12]; return low.includes('b')?FLATS:SHARPS; }
+const pc=n=>((n%12)+12)%12;
+function stringLabels(ins,notes,M){ M=M||spellMode(notes,0); return notes.map((n,i)=>{ const x=M[pc(n)]; return ins==='guitar'&&i===notes.length-1?x.toLowerCase():x; }); }
 function getTun(ins,st){
   st=st||state;
   if(ins==='synth') return null;
-  if(st.tuning[ins]!=='custom') return TUNINGS[ins][st.tuning[ins]];
-  const notes=st.custom[ins];
-  return {name:'Custom ('+notes.map(n=>NAMES[n%12]).join(' ')+')',notes,labels:notes.map((n,i)=>{ const x=NAMES[n%12]; return ins==='guitar'&&i===notes.length-1?x.toLowerCase():x; })};
+  if(st.tuning[ins]==='custom'){
+    const notes=st.custom[ins], M=spellMode(notes,0);
+    return {name:notes.map(n=>M[pc(n)]).join(''),desc:'Custom tuning',notes,labels:stringLabels(ins,notes,M)};
+  }
+  const sh=TUNINGS[ins][st.tuning[ins]], t=st.transpose[ins]||0, notes=sh.notes.map(n=>n+t), M=spellMode(notes,t), low=M[pc(notes[0])], sfx=sh.sfx||'';
+  let desc;
+  if(sh.kind==='std') desc=low+' standard'+sfx;
+  else if(sh.kind==='drop') desc='Drop '+low+sfx;
+  else if(sh.kind==='open') desc='Open '+M[pc(sh.root+t)];
+  else desc = t===0 ? sh.name : sh.name+', '+Math.abs(t)+' semitone'+(Math.abs(t)>1?'s':'')+(t<0?' down':' up');
+  return {name:notes.map(n=>M[pc(n)]).join(''),desc,notes,labels:stringLabels(ins,notes,M)};
 }
 const KEYS = {A:{r:[1,1],p:[1,1]},A2:{r:[1,1],p:[1,2]},B:{r:[1,2],p:[1,3]},C:{r:[3,3],p:[4,4]},B2:{r:[1,4],p:[1,5]},D:{r:[5,5],p:[6,6]}};
 const noteName = m => NAMES[((m%12)+12)%12] + (Math.floor(m/12)-1);
@@ -376,13 +392,18 @@ function wpick(items, w, u){ let s=0; for(const x of w) s+=x; let t=u*s; for(let
 const newSeed = () => { try { const a=new Uint32Array(1); crypto.getRandomValues(a); return a[0]%999999+1; } catch(e){ return Math.floor(Math.random()*999999)+1; } };
 
 /* ---------- state ---------- */
-const DEFAULTS = {instrument:'guitar',tuning:{guitar:'std',bass:'std4'},tone:{guitar:'crunch',bass:'finger',synth:'saw'},
+const DEFAULTS = {instrument:'guitar',tuning:{guitar:'std',bass:'std4'},transpose:{guitar:0,bass:0},tone:{guitar:'crunch',bass:'finger',synth:'saw'},
   root:4,scale:'Minor (Aeolian)',bars:4,bpm:140,diss:0.3,busy:0.55,cx:0.45,custom:{guitar:[40,45,50,55,59,64],bass:[28,33,38,43]},swing:false,drums:true,loop:true,rSeed:4127,pSeed:90211,edit:null};
 function sanitize(o){
   const s = JSON.parse(JSON.stringify(DEFAULTS));
   if(!o||typeof o!=='object') return s;
   if(['guitar','bass','synth'].includes(o.instrument)) s.instrument=o.instrument;
-  if(o.tuning){ if(TUNINGS.guitar[o.tuning.guitar]) s.tuning.guitar=o.tuning.guitar; if(TUNINGS.bass[o.tuning.bass]) s.tuning.bass=o.tuning.bass; }
+  for(const k of ['guitar','bass']){
+    const tu=o.tuning&&o.tuning[k], tr=o.transpose&&o.transpose[k];
+    if(Number.isInteger(tr)&&tr>=-7&&tr<=2) s.transpose[k]=tr;
+    if(TUNINGS[k][tu]) s.tuning[k]=tu;
+    else if(LEGACY[k][tu]){ s.tuning[k]=LEGACY[k][tu][0]; s.transpose[k]=LEGACY[k][tu][1]; }
+  }
   if(o.tone){ for(const k of ['guitar','bass','synth']) if(o.tone[k] && TONES[k][o.tone[k]]) s.tone[k]=o.tone[k]; }
   if(Number.isInteger(o.root)&&o.root>=0&&o.root<12) s.root=o.root;
   if(SCALES[o.scale]) s.scale=o.scale;
@@ -1004,7 +1025,16 @@ function syncUI(){
   document.querySelectorAll('#insSeg button').forEach(b=>b.setAttribute('aria-pressed',b.dataset.v===st.instrument));
   document.querySelectorAll('#barSeg button').forEach(b=>b.setAttribute('aria-pressed',+b.dataset.v===st.bars));
   $('tuningField').hidden = st.instrument==='synth';
-  if(st.instrument!=='synth') fillSelect($('tuning'),TUNINGS[st.instrument],st.tuning[st.instrument],v=>v.name);
+  const isStr=st.instrument!=='synth', isCustom=isStr&&st.tuning[st.instrument]==='custom';
+  $('transField').hidden=!isStr||isCustom; $('tuneRead').hidden=!isStr;
+  if(isStr){
+    fillSelect($('tuning'),TUNINGS[st.instrument],st.tuning[st.instrument],v=>v.name);
+    fillSelect($('transpose'),Object.fromEntries(TRANSPOSE.map(([v,l])=>[String(v),l])),String(st.transpose[st.instrument]));
+    const T=getTun(st.instrument,st), r=$('tuneRead'); r.innerHTML='';
+    const b=document.createElement('b'); b.textContent=T.name;
+    const sp=document.createElement('span'); sp.textContent=T.desc+' · '+T.notes.map(noteName).join(' ');
+    r.append(b,sp);
+  }
   const showC = st.instrument!=='synth' && st.tuning[st.instrument]==='custom';
   $('customRow').hidden=!showC;
   if(showC){
@@ -1035,6 +1065,7 @@ function changed(restart=true){ syncUI(); render(); persist(); if(restart) resta
 document.querySelectorAll('#insSeg button').forEach(b=>b.onclick=()=>{ if(state.instrument===b.dataset.v) return; regen(null,()=>{ state.instrument=b.dataset.v; }); });
 document.querySelectorAll('#barSeg button').forEach(b=>b.onclick=()=>{ if(state.bars===+b.dataset.v) return; regen(null,()=>{ state.bars=+b.dataset.v; }); });
 $('tuning').onchange=e=>keep(null,()=>{ state.tuning[state.instrument]=e.target.value; });
+$('transpose').onchange=e=>keep(null,()=>{ state.transpose[state.instrument]=+e.target.value; });
 $('tone').onchange=e=>keep(null,()=>{ state.tone[state.instrument]=e.target.value; });
 $('scale').onchange=e=>regen(null,()=>{ state.scale=e.target.value; });
 $('bpm').oninput=e=>keep('bpm',()=>{ state.bpm=+e.target.value; });

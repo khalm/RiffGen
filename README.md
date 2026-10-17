@@ -2,11 +2,11 @@
 
 Generates new, original riffs for guitar, bass or synth — right in the browser. Free, no account, no server.
 
-**Version:** 1.1.0 (shown on the front page)
+**Version:** 1.2.0 (shown on the front page)
 
 ## Features
 - Guitar, bass or synth, each with its own tones (clean/crunch/high gain, fingers/pick/fuzz, saw/pluck/acid)
-- Tunings: Standard, Eb, Drop D, D standard, Drop C, Drop B, DADGAD, Open G, Open D, 7-string, bass 4/5/6-string — or a fully custom tuning (4–7 strings). The tab follows the tuning.
+- Tuning and transpose are separate: pick a tuning (Standard, Drop D, DADGAD, Open G/D/E, 7-string, bass 4/5/6-string or custom) and transpose it from 2 semitones up to 7 down. The actual tuning is shown (e.g. DGCFAD, C#G#C#F#A#D#) and the tab follows it.
 - Key (all 12) and 12 scales/modes
 - Length (1, 2, 4 or 8 bars) and tempo (60–220 BPM, tap tempo)
 - **Dissonance** slider: from roots and power chords to tritones and minor-second clusters
